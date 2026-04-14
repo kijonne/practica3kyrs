@@ -1,0 +1,427 @@
+============================== PR 10 ==============================
+
+factorial.py(5.2-5.4)
+
+def factorial(n):
+    if n < 0:
+        return None          
+    fact = 1
+    for i in range(1, n + 1):
+        fact = fact * i                 # СЮДА СТАВИМ BREACKPOINT
+                                       
+    return fact
+
+if __name__ == "__main__":
+    n = int(input("Введите число n: "))
+    print(f"Факториал {n} = {factorial(n)}")
+
+
+
+
+test_factorial.py(5.5 модуль тест)
+
+import unittest
+from factorial import factorial
+
+class TestFactorial(unittest.TestCase):
+    def test_factorial(self):
+        self.assertEqual(factorial(0), 1)
+        self.assertEqual(factorial(1), 1)
+        self.assertEqual(factorial(5), 120)
+        self.assertEqual(factorial(10), 3628800)
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+
+
+
+
+person.py (5.6)
+
+class Person:
+    def __init__(self):
+        self._name = ""      # закрытое поле
+        self._age = 0        # закрытое поле
+
+    # Методы установки и получения
+    def set_name(self, name):
+        if isinstance(name, str):
+            self._name = name
+        else:
+            self._name = ""
+
+    def get_name(self):
+        return self._name
+
+    def set_age(self, age):
+        if isinstance(age, int) and age >= 0:
+            self._age = age
+        else:
+            self._age = 0
+
+    def get_age(self):
+        return self._age
+
+
+
+
+
+
+test_person.py (5.6)
+
+import unittest
+from person import Person
+
+class TestPerson(unittest.TestCase):
+    def setUp(self):
+        self.p = Person()
+
+    def test_name(self):
+        self.p.set_name("Анна")
+        self.assertEqual(self.p.get_name(), "Анна")
+        self.p.set_name(123)     
+        self.assertEqual(self.p.get_name(), "")
+
+    def test_age(self):
+        self.p.set_age(25)
+        self.assertEqual(self.p.get_age(), 25)
+        self.p.set_age(-10)    
+        self.assertEqual(self.p.get_age(), 0)
+        self.p.set_age("тридцать")  
+        self.assertEqual(self.p.get_age(), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+
+
+
+
+
+
+
+
+============================== PR 11 ==============================
+
+Task1.py (5.1)
+
+import re
+
+def split_sentences(text):
+    pattern = r'(?<=[.!?])\s+|\.\.\.\s*'
+    sentences = re.split(pattern, text)
+    
+    for sentence in sentences:
+        cleaned = sentence.strip()
+        if cleaned: 
+            print(cleaned)
+
+if __name__ == "__main__":
+    example = "Привет мир. Как дела? Отлично! ...А может нет. Что дальше?"
+    print("Исходный текст:")
+    print(example)
+    print("\nПредложения по одному на строке:")
+    split_sentences(example)
+
+
+
+
+Task2.py (5.2)
+
+import re
+
+def replace_bad_words(text):
+    pattern = r'\b(редиска|редиски|редисок|редиску|редисками|редисках|' \
+              r'нехороший человек|нехорошего человека|нехорошему человеку|' \
+              r'нехорошим человеком|нехорошие люди|нехороших людей)\b'
+
+    result = re.sub(pattern, '*давайте жить дружно*', text, flags=re.IGNORECASE)
+    return result
+
+if __name__ == "__main__":
+    example = "Этот редиска опять всё испортил! Нехороший человек! " \
+              "Редиски и нехорошие люди не должны так делать."
+    print("Исходный текст:")
+    print(example)
+    print("\nПосле замены:")
+    print(replace_bad_words(example))
+
+
+
+
+
+Task3.py (5.3)
+import re
+
+def find_dates(text):
+    pattern = r'\b(0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[0-2])\.(\d{2}|\d{4})\b'
+    
+    dates = re.findall(pattern, text)
+    return dates
+
+if __name__ == "__main__":
+    example = "Встреча 15.03.2025 или 01.01.25. " \
+              "Ещё 31.12.2024 и 5.6.23. А 32.13.2025 — это уже не дата."
+    print("Исходный текст:")
+    print(example)
+    print("\nНайденные даты:")
+    for date in find_dates(example):
+        print(f"{date[0]}.{date[1]}.{date[2]}")
+
+
+
+
+
+Task4 (5.4)
+
+import re
+
+def is_strong_password(password):
+    if len(password) < 6:
+        return False
+    if not re.search(r'\d', password):    
+        return False
+    if not re.search(r'[a-z]', password):     
+        return False
+    if not re.search(r'[A-Z]', password):  
+        return False
+    return True
+
+if __name__ == "__main__":
+    print("Введите надёжный пароль (минимум 6 символов, цифра, a-z и A-Z):")
+    while True:
+        pwd = input("Пароль: ")
+        if is_strong_password(pwd):
+            print("Пароль принят")
+            break
+        else:
+            print("Пароль не соответствует требованиям. Попробуйте ещё раз.\n")
+
+
+
+
+
+============================== PR 12 ==============================
+
+Task1 (5.1)
+
+import os
+
+def read_and_exec_file():
+    filename = input("Введите имя файла: ").strip()
+    
+    if not os.path.exists(filename):
+        print(f"Ошибка: файл '{filename}' не существует!")
+        return
+    
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        print("\nСодержимое файла:")
+        print(content)
+        
+        # Проверяем расширение
+        _, ext = os.path.splitext(filename)
+        if ext.lower() == '.py':
+            print("\nФайл .py → выполняем через exec()")
+            exec(content)          # выполняем код из файла
+            print("Выполнение завершено.")
+            
+    except Exception as e:
+        print(f"Ошибка при работе с файлом: {e}")
+
+if __name__ == "__main__":
+    read_and_exec_file()
+
+
+
+
+
+
+
+Task2 (5.2)
+
+import os
+
+def write_to_file():
+    filename = input("Введите имя файла для записи: ").strip()
+    
+    if os.path.exists(filename):
+        choice = input("Файл существует. Дописать (a) или перезаписать (w)? ").strip().lower()
+        mode = 'a' if choice == 'a' else 'w'
+        if mode == 'a':
+            print("Будем дописывать в конец файла.")
+        else:
+            print("Файл будет перезаписан.")
+    else:
+        mode = 'w'
+        print("Файл будет создан.")
+    
+    print("Вводите текст (каждая строка с новой строки). Для окончания введите 'end'")
+    try:
+        with open(filename, mode, encoding='utf-8') as f:
+            while True:
+                line = input()
+                if line.strip().lower() == 'end':
+                    break
+                f.write(line + '\n')
+        print(f"Текст успешно записан в '{filename}'")
+    except Exception as e:
+        print(f"Ошибка: {e}")
+
+if __name__ == "__main__":
+    write_to_file()
+
+
+
+
+
+
+Task3 (5.3)
+
+
+import os
+
+def file_operations():
+    filename = input("Введите имя файла: ").strip()
+    
+    if not os.path.exists(filename):
+        print(f"Ошибка: файл '{filename}' не найден!")
+        return
+    
+    print("\nВыберите операцию:")
+    print("1 — Вывести содержимое")
+    print("2 — Удалить файл")
+    print("3 — Переименовать файл")
+    
+    choice = input("Введите номер (1/2/3): ").strip()
+    
+    try:
+        if choice == '1':
+            with open(filename, 'r', encoding='utf-8') as f:
+                print("\nСодержимое:")
+                print(f.read())
+        
+        elif choice == '2':
+            confirm = input(f"Удалить '{filename}'? (y/n): ").strip().lower()
+            if confirm == 'y':
+                os.remove(filename)
+                print("Файл успешно удалён.")
+        
+        elif choice == '3':
+            new_name = input("Введите новое имя файла: ").strip()
+            if os.path.exists(new_name):
+                print("Ошибка: файл с таким именем уже существует!")
+            else:
+                os.rename(filename, new_name)
+                print(f"Файл переименован в '{new_name}'")
+        
+        else:
+            print("Неверный выбор!")
+    except Exception as e:
+        print(f"Ошибка: {e}")
+
+if __name__ == "__main__":
+    file_operations()
+
+
+
+
+Task4 (5.4)
+
+import os
+
+FILENAME = "sample_text.txt"
+
+def create_sample_file():
+    if not os.path.exists(FILENAME):
+        print(f"Создаём файл {FILENAME} с примерами...")
+        with open(FILENAME, 'w', encoding='utf-8') as f:
+            f.write("Первая строка текста\n")
+            f.write("Вторая строка\n")
+            f.write("Третья строка\n")
+            f.write("Четвёртая строка\n")
+            f.write("Пятая строка — важная!\n")
+            f.write("Шестая строка\n")
+            f.write("Седьмая строка\n")
+            f.write("Восьмая строка\n")
+        print("Файл создан.")
+
+def analyze_text_file():
+    create_sample_file()
+    
+    if not os.path.exists(FILENAME):
+        print("Файл не найден!")
+        return
+    
+    try:
+        with open(FILENAME, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        print(f"\nФайл: {FILENAME} ({len(lines)} строк)")
+        print("1. Первая строка:", lines[0].strip() if len(lines) > 0 else "—")
+        print("2. Пятая строка:", lines[4].strip() if len(lines) > 4 else "—")
+        print("3. Первые 5 строк:")
+        for i in range(min(5, len(lines))):
+            print(f"   {i+1}: {lines[i].strip()}")
+        
+        # Строки с s1 по s2 (пример: 3-6)
+        s1, s2 = 3, 6
+        print(f"4. Строки с {s1} по {s2}:")
+        for i in range(s1-1, min(s2, len(lines))):
+            print(f"   {i+1}: {lines[i].strip()}")
+        
+        print("5. Весь файл:")
+        for i, line in enumerate(lines, 1):
+            print(f"{i}: {line.strip()}")
+            
+    except Exception as e:
+        print(f"Ошибка: {e}")
+
+if __name__ == "__main__":
+    analyze_text_file()
+
+
+
+
+Task5 (5.5)
+
+import os
+
+FILENAME = "numbers.txt"
+
+def create_numbers_file():
+    if not os.path.exists(FILENAME):
+        print(f"Создаём файл {FILENAME} с примерами чисел...")
+        with open(FILENAME, 'w', encoding='utf-8') as f:
+            f.write("10 20 30\n")
+            f.write("5 15\n")
+            f.write("100 200 300 400\n")
+            f.write("1 2 3 4 5 6\n")
+            f.write("   7   8  9 \n") 
+        print("Файл создан.")
+
+def sum_numbers_in_lines():
+    create_numbers_file()
+    
+    if not os.path.exists(FILENAME):
+        print("Файл не найден!")
+        return
+    
+    try:
+        with open(FILENAME, 'r', encoding='utf-8') as f:
+            print(f"Файл: {FILENAME}\n")
+            for i, line in enumerate(f, 1):
+                numbers = [int(x) for x in line.split() if x.isdigit() or (x.startswith('-') and x[1:].isdigit())]
+                total = sum(numbers)
+                print(f"Строка {i}: {line.strip()} → сумма = {total}")
+    except Exception as e:
+        print(f"Ошибка: {e}")
+
+if __name__ == "__main__":
+    sum_numbers_in_lines()
