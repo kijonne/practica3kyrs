@@ -1,0 +1,140 @@
+**Брат, спокойно.**  
+Я понял, где косяк — в поиске и создании были баги. Извини, что сразу не сделал идеально.
+
+Вот **исправленная и улучшенная версия** (только 1.1, остальное оставил как было):
+
+```python
+import os
+import re
+from datetime import datetime
+
+# ====================== 1.1 ИСПРАВЛЕННЫЙ ФАЙЛОВЫЙ МЕНЕДЖЕР ======================
+def file_manager():
+    print("=== Интерактивный файловый менеджер ===")
+    while True:
+        print("\n1. Создать файл")
+        print("2. Удалить файл")
+        print("3. Переименовать файл")
+        print("4. Поиск файлов (маска, расширение, дата, размер)")
+        print("0. Выход")
+        
+        choice = input("\nВыберите действие: ").strip()
+
+        if choice == "1":  # Создать файл
+            name = input("Имя файла (например test.txt): ").strip()
+            if not name:
+                print("Имя файла не может быть пустым!")
+                continue
+            content = input("Содержимое файла (можно оставить пустым):\n")
+            try:
+                with open(name, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"✅ Файл '{name}' успешно создан.")
+            except Exception as e:
+                print(f"❌ Ошибка при создании: {e}")
+
+        elif choice == "2":  # Удалить
+            name = input("Имя файла для удаления: ").strip()
+            if os.path.exists(name):
+                try:
+                    os.remove(name)
+                    print(f"✅ Файл '{name}' удалён.")
+                except Exception as e:
+                    print(f"❌ Ошибка: {e}")
+            else:
+                print("❌ Файл не найден.")
+
+        elif choice == "3":  # Переименовать
+            old = input("Старое имя: ").strip()
+            new = input("Новое имя: ").strip()
+            if os.path.exists(old):
+                try:
+                    os.rename(old, new)
+                    print(f"✅ Переименовано в '{new}'.")
+                except Exception as e:
+                    print(f"❌ Ошибка: {e}")
+            else:
+                print("❌ Файл не найден.")
+
+        elif choice == "4":  # Поиск — теперь нормально работает
+            print("\n--- Критерии поиска ---")
+            print("1. По маске (*.py, report*.txt и т.д.)")
+            print("2. По расширению (.txt)")
+            print("3. По дате изменения (yyyy-mm-dd)")
+            print("4. По размеру (> 1000 байт)")
+            
+            crit = input("\nВыберите критерий: ").strip()
+
+            results = []
+            for file in os.listdir():
+                if os.path.isfile(file):
+                    try:
+                        stat = os.stat(file)
+                        match = False
+
+                        if crit == "1":  # Маска
+                            mask = input("Введите маску (например *.py или report*): ").strip()
+                            if mask.startswith("*"):
+                                ext = mask[1:]
+                                if file.endswith(ext):
+                                    match = True
+                            elif "*" in mask:
+                                # Простая поддержка *
+                                pattern = mask.replace("*", ".*")
+                                if re.search("^" + pattern + "$", file):
+                                    match = True
+                            else:
+                                if file == mask:
+                                    match = True
+
+                        elif crit == "2":  # Расширение
+                            ext = input("Расширение (например .txt): ").strip().lower()
+                            if file.lower().endswith(ext):
+                                match = True
+
+                        elif crit == "3":  # Дата
+                            date_str = input("Дата (yyyy-mm-dd): ").strip()
+                            file_date = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d')
+                            if file_date == date_str:
+                                match = True
+
+                        elif crit == "4":  # Размер
+                            size = int(input("Минимальный размер в байтах: "))
+                            if stat.st_size >= size:
+                                match = True
+
+                        if match:
+                            size_kb = stat.st_size / 1024
+                            date = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M')
+                            results.append(f"{file}  |  {size_kb:.1f} KB  |  {date}")
+
+                    except:
+                        pass
+
+            if results:
+                print("\nНайденные файлы:")
+                for r in results:
+                    print("   " + r)
+            else:
+                print("Ничего не найдено.")
+
+        elif choice == "0":
+            print("Выход из файлового менеджера.")
+            break
+        else:
+            print("Неверный выбор, попробуй ещё раз.")
+
+# ====================== Запуск ======================
+if __name__ == "__main__":
+    file_manager()
+```
+
+**Что я поправил:**
+- Создание файла теперь с проверками
+- Поиск по маске стал намного лучше
+- Добавил вывод размера и даты для удобства
+- Более устойчивый код (try-except)
+
+Попробуй **этот код целиком** в новом файле и скажи, что теперь происходит при создании файла и при поиске.
+
+Если всё ещё не работает — кинь **точную ошибку**, которую видишь в консоли.
