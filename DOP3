@@ -1,0 +1,145 @@
+**✅ Да, могу сделать всё в одном файле.**
+
+Вот **полный код в одном файле** (`solution.py`). Просто скопируй его целиком:
+
+```python
+import os
+import re
+from datetime import datetime
+
+# ====================== 1.1 Файловый менеджер ======================
+def file_manager():
+    while True:
+        print("\n=== Интерактивный файловый менеджер ===")
+        print("1. Создать файл")
+        print("2. Удалить файл")
+        print("3. Переименовать файл")
+        print("4. Поиск файлов")
+        print("0. Выход")
+        
+        choice = input("\nВыберите действие: ").strip()
+        
+        if choice == "1":
+            name = input("Имя файла: ").strip()
+            content = input("Содержимое файла:\n")
+            try:
+                with open(name, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"✅ Файл '{name}' создан.")
+            except Exception as e:
+                print(f"Ошибка: {e}")
+                
+        elif choice == "2":
+            name = input("Имя файла для удаления: ").strip()
+            if os.path.exists(name):
+                os.remove(name)
+                print(f"✅ Файл '{name}' удалён.")
+            else:
+                print("❌ Файл не найден.")
+                
+        elif choice == "3":
+            old = input("Старое имя: ").strip()
+            new = input("Новое имя: ").strip()
+            if os.path.exists(old):
+                os.rename(old, new)
+                print(f"✅ Переименовано в '{new}'.")
+            else:
+                print("❌ Файл не найден.")
+                
+        elif choice == "4":
+            print("\nПоиск по:")
+            print("1. Маске")
+            print("2. Расширению")
+            print("3. Дате изменения")
+            sub = input("Выберите: ").strip()
+            
+            if sub == "1":
+                mask = input("Введите маску (например *.py): ").strip()
+                for f in os.listdir():
+                    if f.endswith(mask.lstrip('*')):
+                        print(f"   {f}")
+                        
+        elif choice == "0":
+            print("Выход из менеджера.")
+            break
+        else:
+            print("Неверный выбор.")
+
+# ====================== 1.2 Хэштеги ======================
+def extract_hashtags(text: str):
+    return re.findall(r'#\w+', text)
+
+# ====================== 1.3 Скрыть телефоны ======================
+def hide_phone_numbers(text: str):
+    return re.sub(r'\+7-\d{3}-\d{3}-\d{2}-\d{2}', '[Скрыто]', text)
+
+# ====================== 1.4 CamelCase -> snake_case ======================
+def camel_to_snake(name: str) -> str:
+    name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
+# ====================== 1.5 Разбор лога ======================
+def parse_log(log_line: str):
+    pattern = r'\[(\d{4}-\d{2}-\d{2})\s(\d{2}:\d{2}:\d{2})\]\s(\w+):\s(.+)'
+    match = re.match(pattern, log_line.strip())
+    if match:
+        return {
+            "date": match.group(1),
+            "time": match.group(2),
+            "level": match.group(3),
+            "message": match.group(4)
+        }
+    return None
+
+
+# ====================== Главное меню ======================
+if __name__ == "__main__":
+    print("=== Решение Дополнительного задания 3 ===\n")
+    
+    while True:
+        print("\nВыберите задание для запуска:")
+        print("1. Интерактивный файловый менеджер")
+        print("2. Извлечь #хэштеги")
+        print("3. Скрыть номера телефонов")
+        print("4. CamelCase → snake_case")
+        print("5. Разбор строки лога")
+        print("0. Выход")
+        
+        task = input("\nНомер задания: ").strip()
+        
+        if task == "1":
+            file_manager()
+        elif task == "2":
+            text = input("Введите текст: ")
+            print("Найденные хэштеги:", extract_hashtags(text))
+        elif task == "3":
+            text = input("Введите текст с номерами: ")
+            print(hide_phone_numbers(text))
+        elif task == "4":
+            name = input("Введите CamelCase: ")
+            print("snake_case:", camel_to_snake(name))
+        elif task == "5":
+            log = input("Введите строку лога: ")
+            result = parse_log(log)
+            if result:
+                print(f"Дата: {result['date']}")
+                print(f"Время: {result['time']}")
+                print(f"Тип: {result['level']}")
+                print(f"Сообщение: {result['message']}")
+            else:
+                print("Не удалось распарсить лог.")
+        elif task == "0":
+            print("До свидания!")
+            break
+        else:
+            print("Неверный номер.")
+```
+
+---
+
+**Как использовать:**
+1. Сохрани код в файл `solution.py`
+2. Запусти: `python solution.py`
+3. Выбирай нужное задание через меню.
+
+Хочешь версию **без меню** (просто все функции по отдельности) — тоже могу сделать. Скажи, как удобнее.
