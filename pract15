@@ -1,0 +1,145 @@
+**Вот готовые решения только по тем пунктам, которые просят (5.1 — 5.4).**  
+Всё на **Python + Tkinter**, без лишнего.
+
+---
+
+### **5.1** — Многострочное поле + кнопка «Сохранить» + Ctrl+S + Esc
+
+```python
+from tkinter import *
+from tkinter import filedialog, messagebox
+
+root = Tk()
+root.title("5.1 Сохранение текста")
+root.geometry("600x400")
+
+text = Text(root, wrap=WORD, font=("Consolas", 11))
+text.pack(fill=BOTH, expand=True, padx=10, pady=10)
+
+def save_file():
+    file = filedialog.asksaveasfilename(
+        defaultextension=".txt",
+        filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+    )
+    if file:
+        try:
+            with open(file, "w", encoding="utf-8") as f:
+                f.write(text.get("1.0", END))
+            messagebox.showinfo("Успешно", "Файл сохранён!")
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e))
+
+# Кнопка
+btn = Button(root, text="Сохранить", command=save_file)
+btn.pack(pady=5)
+
+# Ctrl+S
+root.bind("<Control-s>", lambda e: save_file())
+root.bind("<Control-S>", lambda e: save_file())
+
+# Esc — закрыть
+root.bind("<Escape>", lambda e: root.destroy())
+
+root.mainloop()
+```
+
+---
+
+### **5.2** — Три поля ввода + bind_class
+
+```python
+from tkinter import *
+
+root = Tk()
+root.title("5.2 bind_class")
+root.geometry("500x300")
+
+Label(root, text="Поле 1:").pack(anchor=W, padx=10, pady=5)
+entry1 = Entry(root, width=50)
+entry1.pack(padx=10)
+
+Label(root, text="Поле 2:").pack(anchor=W, padx=10, pady=5)
+entry2 = Entry(root, width=50)
+entry2.pack(padx=10)
+
+Label(root, text="Поле 3:").pack(anchor=W, padx=10, pady=5)
+entry3 = Entry(root, width=50)
+entry3.pack(padx=10)
+
+info_label = Label(root, text="Активное поле: —", font=("Arial", 12))
+info_label.pack(pady=20)
+
+def on_click(event, button="left"):
+    # Находим какое поле сейчас в фокусе
+    focused = root.focus_get()
+    if focused in (entry1, entry2, entry3):
+        name = focused.get() or f"Поле {list(root.children.values()).index(focused)+1}"
+        if button == "left":
+            info_label.config(text=f"Активное поле: {name}")
+        else:  # right
+            print(f"Правый клик → {name}")
+
+# Подписываемся на все Entry через bind_class
+root.bind_class("Entry", "<Button-1>", lambda e: on_click(e, "left"))
+root.bind_class("Entry", "<Button-3>", lambda e: on_click(e, "right"))
+
+root.mainloop()
+```
+
+---
+
+### **5.3** — Координаты мыши
+
+```python
+from tkinter import *
+
+root = Tk()
+root.title("5.3 Координаты мыши")
+root.geometry("600x400")
+
+label = Label(root, text="Координаты мыши: (x, y)", 
+              font=("Arial", 14), height=3)
+label.pack(expand=True)
+
+def mouse_move(event):
+    label.config(text=f"Координаты мыши: ({event.x}, {event.y})")
+
+root.bind("<Motion>", mouse_move)
+
+root.mainloop()
+```
+
+---
+
+### **5.4** — Нажатые клавиши
+
+```python
+from tkinter import *
+
+root = Tk()
+root.title("5.4 Нажатые клавиши")
+root.geometry("600x400")
+
+label = Label(root, text="Нажатая клавиша: ", 
+              font=("Arial", 14), height=5)
+label.pack(expand=True)
+
+def key_pressed(event):
+    if event.char:  # только печатные символы
+        current = label.cget("text")
+        if current.startswith("Нажатая клавиша: "):
+            label.config(text=f"Нажатая клавиша: {event.char}")
+        else:
+            label.config(text=current + event.char)
+
+root.bind("<Key>", key_pressed)
+
+root.mainloop()
+```
+
+---
+
+Готово!  
+Запускай каждый скрипт отдельно через Python IDLE, как написано в пункте 6.1.
+
+Если нужно что-то подправить — пиши.
