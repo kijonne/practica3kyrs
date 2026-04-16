@@ -7,113 +7,77 @@ import random
 class TaskManager:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Диспетчер задач — Практическая работа 18")
-        self.root.geometry("800x500")
+        self.root.title("Диспетчер задач")
+        self.root.geometry("600x400")
         
-        self.processes = {}        # id: {"name": , "thread": , "status": }
+        self.processes = {}      # pid: {"name": , "thread": }
         self.next_id = 1
         
         self.create_widgets()
-        self.update_process_list()
 
     def create_widgets(self):
-        # Заголовок
-        tk.Label(self.root, text="Диспетчер задач", font=("Arial", 16, "bold")).pack(pady=10)
+        tk.Label(self.root, text="Диспетчер задач", font=("Arial", 14, "bold")).pack(pady=10)
         
-        # Кнопки управления
+        # Кнопки
         btn_frame = tk.Frame(self.root)
-        btn_frame.pack(pady=5)
+        btn_frame.pack(pady=10)
         
         tk.Button(btn_frame, text="Запустить новый процесс", 
-                 command=self.start_new_process, bg="#4CAF50", fg="white", width=25).pack(side=tk.LEFT, padx=5)
+                 command=self.start_new_process, width=25).pack(side=tk.LEFT, padx=10)
         
-        tk.Button(btn_frame, text="Принудительно завершить", 
-                 command=self.kill_selected_process, bg="#f44336", fg="white", width=25).pack(side=tk.LEFT, padx=5)
-        
-        tk.Button(btn_frame, text="Обновить список", 
-                 command=self.update_process_list, width=20).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Завершить процесс", 
+                 command=self.kill_selected_process, width=25).pack(side=tk.LEFT, padx=10)
 
-        # Таблица процессов
-        columns = ("ID", "Имя процесса", "Статус", "Время работы")
-        self.tree = ttk.Treeview(self.root, columns=columns, show="headings", height=15)
+        # Таблица (только ID и Название)
+        columns = ("ID", "Название задачи")
+        self.tree = ttk.Treeview(self.root, columns=columns, show="headings", height=12)
         
         self.tree.heading("ID", text="ID")
-        self.tree.heading("Имя процесса", text="Имя процесса")
-        self.tree.heading("Статус", text="Статус")
-        self.tree.heading("Время работы", text="Время работы")
+        self.tree.heading("Название задачи", text="Название задачи")
         
-        self.tree.column("ID", width=50, anchor="center")
-        self.tree.column("Имя процесса", width=250)
-        self.tree.column("Статус", width=120, anchor="center")
-        self.tree.column("Время работы", width=150, anchor="center")
+        self.tree.column("ID", width=80, anchor="center")
+        self.tree.column("Название задачи", width=400)
         
-        self.tree.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
-
-        # Скроллбар
-        scrollbar = ttk.Scrollbar(self.root, orient=tk.VERTICAL, command=self.tree.yview)
-        self.tree.configure(yscroll=scrollbar.set)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
 
     def start_new_process(self):
-        name = f"Process-{self.next_id:03d}"
+        name = f"Задача-{self.next_id:03d}"
         
-        t = threading.Thread(target=self.simulate_process, args=(self.next_id, name), daemon=True)
+        t = threading.Thread(target=self.simulate_process, args=(self.next_id,), daemon=True)
         t.start()
         
-        self.processes[self.next_id] = {
-            "name": name,
-            "thread": t,
-            "status": "Работает",
-            "start_time": time.time()
-        }
-        
+        self.processes[self.next_id] = {"name": name, "thread": t}
         self.next_id += 1
-        self.update_process_list()
+        self.update_list()
 
-    def simulate_process(self, pid, name):
-        work_time = random.randint(10, 30)  # сколько секунд будет работать
-        start = time.time()
-        
-        for i in range(work_time):
-            if pid not in self.processes:  # если процесс был убит
-                return
-            time.sleep(1)
-        
-        # Если процесс завершился сам
+    def simulate_process(self, pid):
+        # Имитация работы процесса (от 5 до 20 секунд)
+        time.sleep(random.randint(5, 20))
+        # После завершения автоматически удаляем из списка
         if pid in self.processes:
-            self.processes[pid]["status"] = "Завершён"
-            self.update_process_list()
+            del self.processes[pid]
+            self.update_list()
 
     def kill_selected_process(self):
         selected = self.tree.selection()
         if not selected:
-            messagebox.showwarning("Предупреждение", "Выберите процесс для завершения!")
+            messagebox.showwarning("Внимание", "Сначала выберите процесс!")
             return
         
-        item = self.tree.item(selected[0])
-        pid = int(item['values'][0])
+        pid = int(self.tree.item(selected[0])['values'][0])
         
         if pid in self.processes:
-            del self.processes[pid]   # "убиваем" процесс
-            messagebox.showinfo("Успешно", f"Процесс {pid} был принудительно завершён")
-            self.update_process_list()
+            del self.processes[pid]
+            messagebox.showinfo("Завершено", f"Процесс {pid} завершён")
+            self.update_list()
 
-    def update_process_list(self):
+    def update_list(self):
         # Очищаем таблицу
         for item in self.tree.get_children():
             self.tree.delete(item)
         
         for pid, info in self.processes.items():
-            runtime = "—"
-            if info["status"] == "Работает":
-                runtime = f"{int(time.time() - info['start_time'])} сек"
-            
-            self.tree.insert("", "end", values=(
-                pid,
-                info["name"],
-                info["status"],
-                runtime
-            ))
+            self.tree.insert("", "end", values=(pid, info["name"]))
 
     def run(self):
         self.root.mainloop()
