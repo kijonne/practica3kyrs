@@ -1,0 +1,31 @@
+import socket
+import tkinter as tk
+
+HOST = 'localhost'
+PORT = 50007
+
+def send_message():
+    login = entry_login.get()
+    message = entry_message.get()
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((HOST, PORT))
+    s.sendall(login.encode())
+    s.sendall(f'{login}: {message}'.encode())
+    s.close()
+
+window = tk.Tk()
+window.title('Чат-клиент')
+
+tk.Label(window, text='Логин:').grid(row=0, column=0, padx=5, pady=5)
+entry_login = tk.Entry(window)
+entry_login.grid(row=0, column=1, padx=5, pady=5)
+
+tk.Label(window, text='Сообщение:').grid(row=1, column=0, padx=5, pady=5)
+entry_message = tk.Entry(window)
+entry_message.grid(row=1, column=1, padx=5, pady=5)
+
+btn_send = tk.Button(window, text='Отправить', command=send_message)
+btn_send.grid(row=2, column=0, columnspan=2, pady=10)
+
+window.mainloop()
