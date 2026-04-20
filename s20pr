@@ -1,0 +1,178 @@
+**✅ Вот полный рабочий код для Практической работы №20**
+
+### 1. ControlsView.axaml (полная разметка — всё задание 5.2–5.9)
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:HelloApp.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="900"
+             x:Class="HelloApp.Views.ControlsView"
+             x:DataType="vm:ControlsViewModel">
+
+    <ScrollViewer>
+        <StackPanel Spacing="30" Margin="20">
+
+            <!-- 5.2 TextBlock с форматированием -->
+            <TextBlock FontSize="16" TextWrapping="Wrap">
+                <Run Text="Обычный текст. " Foreground="Black" />
+                <Run Text="Красный текст. " Foreground="Red" />
+                <LineBreak />
+                <Run Text="Синий текст после переноса. " Foreground="Blue" />
+                <Span FontSize="22" Background="Yellow">
+                    <Run Text="Span с большим шрифтом и жёлтым фоном" Foreground="DarkGreen" />
+                </Span>
+                <LineBreak />
+                <Bold>Жирный текст. </Bold>
+                <Italic>Курсив. </Italic>
+                <Underline>Подчёркнутый.</Underline>
+                <InlineUIContainer BaselineAlignment="Center">
+                    <Image Width="32" Height="32" Source="/Assets/avalonia-logo.ico" />
+                </InlineUIContainer>
+                <InlineUIContainer BaselineAlignment="Center">
+                    <Button Content="Кнопка внутри текста" FontSize="12" Padding="8,4" />
+                </InlineUIContainer>
+            </TextBlock>
+
+            <!-- 5.3 TextBox -->
+            <StackPanel Spacing="15">
+                <TextBlock Text="Логин" FontWeight="Bold" />
+                <TextBox Watermark="Введите логин" Text="{Binding Login}" />
+
+                <TextBlock Text="Пароль" FontWeight="Bold" />
+                <TextBox Watermark="Введите пароль" PasswordChar="•" Text="{Binding Password}" />
+
+                <TextBlock Text="Email" FontWeight="Bold" />
+                <TextBox Watermark="your@email.com" 
+                         Text="{Binding Email}">
+                    <TextBox.TextInputOptions>
+                        <TextInputOptions ContentType="Email" />
+                    </TextBox.TextInputOptions>
+                </TextBox>
+
+                <TextBlock Text="Числовой код" FontWeight="Bold" />
+                <TextBox Watermark="123456" 
+                         Text="{Binding Code}">
+                    <TextBox.TextInputOptions>
+                        <TextInputOptions ContentType="Digits" />
+                    </TextBox.TextInputOptions>
+                </TextBox>
+            </StackPanel>
+
+            <!-- 5.4 CheckBox -->
+            <CheckBox Content="Я согласен с условиями" IsChecked="{Binding IsAgreed}" />
+
+            <!-- 5.5 RadioButton -->
+            <StackPanel Spacing="10">
+                <RadioButton GroupName="Gender" Content="Мужской" IsChecked="{Binding IsMale}" />
+                <RadioButton GroupName="Gender" Content="Женский" />
+                <RadioButton GroupName="Color" Content="Красный" />
+                <RadioButton GroupName="Color" Content="Синий" IsChecked="True" />
+            </StackPanel>
+
+            <!-- 5.6 CalendarDatePicker + возраст -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Дата рождения" FontWeight="Bold" />
+                <CalendarDatePicker SelectedDate="{Binding SelectedDate}" />
+                <TextBlock Text="{Binding Age, StringFormat='Ваш возраст: {0} лет'}" 
+                           FontSize="18" FontWeight="Bold" Foreground="DarkBlue" />
+            </StackPanel>
+
+            <!-- 5.7 ComboBox -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Язык программирования" FontWeight="Bold" />
+                <ComboBox ItemsSource="{Binding Languages}" 
+                          SelectedItem="{Binding SelectedLanguage}" />
+                <TextBlock Text="{Binding SelectedLanguage, StringFormat='Вы выбрали: {0}'}" 
+                           FontSize="16" />
+            </StackPanel>
+
+            <!-- 5.8 Slider + Rectangle -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Прозрачность" FontWeight="Bold" />
+                <Slider Minimum="0" Maximum="1" Value="{Binding OpacityValue}" />
+                <Rectangle Width="300" Height="100" Fill="Purple" 
+                           Opacity="{Binding OpacityValue}" />
+            </StackPanel>
+
+            <!-- 5.9 ToggleSwitch -->
+            <ToggleSwitch OnContent="Включено" 
+                          OffContent="Выключено"
+                          IsChecked="{Binding IsEnabled}" />
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+```
+
+### 2. ControlsView.axaml.cs
+```csharp
+using Avalonia.Controls;
+using Avalonia.Markup.Xaml;
+
+namespace HelloApp.Views;
+
+public partial class ControlsView : UserControl
+{
+    public ControlsView()
+    {
+        InitializeComponent();
+        DataContext = new ViewModels.ControlsViewModel();
+    }
+}
+```
+
+### 3. ControlsViewModel.cs (папка ViewModels)
+```csharp
+using CommunityToolkit.Mvvm.ComponentModel;
+using System;
+using System.Collections.ObjectModel;
+
+namespace HelloApp.ViewModels;
+
+public partial class ControlsViewModel : ViewModelBase
+{
+    [ObservableProperty] private string login = string.Empty;
+    [ObservableProperty] private string password = string.Empty;
+    [ObservableProperty] private string email = string.Empty;
+    [ObservableProperty] private string code = string.Empty;
+
+    [ObservableProperty] private bool isAgreed;
+
+    [ObservableProperty] private bool isMale = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Age))]
+    private DateTime selectedDate = DateTime.Today;
+
+    public int Age => SelectedDate == default 
+        ? 0 
+        : DateTime.Today.Year - SelectedDate.Year - (SelectedDate.Date > DateTime.Today.Date ? 1 : 0);
+
+    [ObservableProperty] private ObservableCollection<string> languages = 
+        new() { "C#", "Python", "JavaScript", "Java", "Go" };
+
+    [ObservableProperty] private string? selectedLanguage;
+
+    [ObservableProperty] private double opacityValue = 1.0;
+
+    [ObservableProperty] private bool isEnabled = true;
+}
+```
+
+### 4. RegistrationView (5.10) — если нужно (с валидацией)
+Если хочешь — скажи «сделай регистрацию» и я сразу дам `RegistrationView.axaml`, `UserCredentials.cs` и `RegistrationViewModel.cs` с полной валидацией (логин, пароль, email, телефон).
+
+---
+
+**Как запустить:**
+1. Создай новый **Avalonia User Control** → `ControlsView`
+2. Замени файлы на код выше
+3. В `MainWindow.axaml` временно поставь `<views:ControlsView />`
+4. Запусти — всё должно работать
+
+Хочешь сразу **полный код RegistrationView с валидацией** (5.10)?  
+Просто напиши «регистрация» или «5.10».  
+
+Готово, братан! 🔥
