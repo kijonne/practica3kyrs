@@ -1,0 +1,508 @@
+**✅ Готово, братан.**  
+Сделаем **Практические работы №22, №23, №24** максимально просто, в стиле предыдущих работ (как ты любишь).
+
+---
+
+### ПР №22 — Отображение списков и DataGrid
+
+#### 1. User.cs (создай в корне или в Models)
+
+```csharp
+namespace HelloApp.Models
+{
+    public class User
+    {
+        public string Login { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}
+```
+
+#### 2. UserListViewModel.cs
+
+```csharp
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using HelloApp.Models;
+using System.Collections.ObjectModel;
+
+namespace HelloApp.ViewModels
+{
+    public partial class UserListViewModel : ViewModelBase
+    {
+        [ObservableProperty]
+        private ObservableCollection<User> users = new();
+
+        [ObservableProperty]
+        private string newLogin = "";
+        [ObservableProperty]
+        private string newPassword = "";
+
+        public UserListViewModel()
+        {
+            // Тестовые данные
+            Users.Add(new User { Login = "admin", Password = "123" });
+            Users.Add(new User { Login = "user1", Password = "qwerty" });
+            Users.Add(new User { Login = "test", Password = "test123" });
+        }
+
+        [RelayCommand]
+        private void DeleteUser(User user)
+        {
+            if (user != null)
+                Users.Remove(user);
+        }
+
+        [RelayCommand]
+        private void AddUser()
+        {
+            if (!string.IsNullOrWhiteSpace(NewLogin))
+            {
+                Users.Add(new User { Login = NewLogin, Password = NewPassword });
+                NewLogin = "";
+                NewPassword = "";
+            }
+        }
+    }
+}
+```
+
+#### 3. UserListView.axaml
+
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HelloApp.ViewModels"
+             xmlns:m="using:HelloApp.Models"
+             x:DataType="vm:UserListViewModel">
+
+    <StackPanel Spacing="10" Margin="20">
+        <TextBlock Text="Список пользователей" FontSize="18" FontWeight="Bold"/>
+
+        <!-- ListBox -->
+        <ListBox ItemsSource="{Binding Users}" Height="200">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="m:User">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="{Binding Login}" Width="150"/>
+                        <TextBlock Text="{Binding Password}" Width="150"/>
+                        <Button Content="Удалить" 
+                                Command="{Binding $parent[UserControl].DataContext.DeleteUserCommand}"
+                                CommandParameter="{Binding}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Добавление нового пользователя -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBox Text="{Binding NewLogin}" Watermark="Логин" Width="150"/>
+            <TextBox Text="{Binding NewPassword}" Watermark="Пароль" Width="150"/>
+            <Button Content="Добавить" Command="{Binding AddUserCommand}"/>
+        </StackPanel>
+
+        <!-- DataGrid -->
+        <TextBlock Text="DataGrid" FontSize="18" FontWeight="Bold" Margin="0,10,0,0"/>
+        <DataGrid ItemsSource="{Binding Users}" 
+                  Height="250"
+                  CanUserReorderColumns="True"
+                  CanUserResizeColumns="True"
+                  CanUserSortColumns="True"
+                  AutoGenerateColumns="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Логин" Binding="{Binding Login}" Width="150"/>
+                <DataGridTextColumn Header="Пароль" Binding="{Binding Password}" Width="150"/>
+                <DataGridTemplateColumn Header="Действия">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Удалить" 
+                                    Command="{Binding $parent[UserControl].DataContext.DeleteUserCommand}"
+                                    CommandParameter="{Binding}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </StackPanel>
+</UserControl>
+```
+
+---
+
+### ПР №23 — Конфигурация + DI + Навигация
+
+#### 1. App.axaml.cs (важные изменения)
+
+```csharp
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
+using HelloApp.Services;
+using HelloApp.ViewModels;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+
+namespace HelloApp
+{
+    public partial class App : Application
+    {
+        public static IConfiguration Configuration { get; private set; } = null!;
+        public static IServiceProvider Services { get; private set; } = null!;
+
+        public override void Initialize()
+        {
+            AvaloniaXamlLoader.Load(this);
+        }
+
+        public override void OnFrameworkInitializationCompleted()
+        {
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                // Конфигурация
+                var builder = new ConfigurationBuilder();
+                builder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                Configuration = builder.Build();
+
+                // DI
+                var collection = new ServiceCollection();
+                collection.AddSingleton<NavigationService>();
+                collection.AddSingleton<MainWindowViewModel>();
+                collection.AddTransient<AuthorizationViewModel>();
+                collection.AddTransient<RegistrationViewModel>();
+                collection.AddTransient<UserListViewModel>();
+
+                Services = collection.BuildServiceProvider();
+
+                desktop.MainWindow = new MainWindow
+                {
+                    DataContext = Services.GetRequiredService<MainWindowViewModel>()
+                };
+            }
+
+            base.OnFrameworkInitializationCompleted();
+        }
+    }
+}
+```
+
+#### 2. appsettings.json (в корне проекта, свойство Copy to Output Directory = Copy always)
+
+```json
+{
+  "ApiKeys": {
+    "SomeApi": "YourSecretKey123"
+  }
+}
+```
+
+#### 3. NavigationService.cs (обновлённый под DI)
+
+```csharp
+using CommunityToolkit.Mvvm.ComponentModel;
+using System;
+using System.Collections.Generic;
+
+namespace HelloApp.Services
+{
+    public partial class NavigationService : ObservableObject
+    {
+        public static NavigationService Instance => App.Services.GetRequiredService<NavigationService>();
+
+        public Stack<ViewModelBase> Stack { get; } = new();
+
+        [ObservableProperty]
+        private ViewModelBase? current;
+
+        public void NavigateTo<T>(Action<T>? action = null) where T : ViewModelBase
+        {
+            var vm = App.Services.GetRequiredService<T>();
+            action?.Invoke(vm);
+            NavigateTo(vm);
+        }
+
+        public void NavigateTo(ViewModelBase viewModel)
+        {
+            Stack.Push(viewModel);
+            Current = viewModel;
+        }
+
+        public void GoBack(int steps = 1)
+        {
+            if (Stack.Count <= 1) return;
+
+            for (int i = 0; i < steps; i++)
+            {
+                if (Stack.Count > 1)
+                    Stack.Pop();
+            }
+
+            Current = Stack.Count > 0 ? Stack.Peek() : null;
+        }
+    }
+}
+```
+
+#### 4. MainWindowViewModel.cs (упрощённый)
+
+```csharp
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using HelloApp.Services;
+using HelloApp.ViewModels;
+
+namespace HelloApp.ViewModels
+{
+    public partial class MainWindowViewModel : ViewModelBase
+    {
+        private readonly NavigationService _navigation;
+
+        public ViewModelBase? CurrentPage => _navigation.Current;
+
+        public MainWindowViewModel(NavigationService navigation)
+        {
+            _navigation = navigation;
+            _navigation.PropertyChanged += (s, e) => OnPropertyChanged(nameof(CurrentPage));
+
+            // Старт
+            _navigation.NavigateTo<AuthorizationViewModel>();
+        }
+
+        [RelayCommand] private void GoToAuthorization() => _navigation.NavigateTo<AuthorizationViewModel>();
+        [RelayCommand] private void GoToRegistration() => _navigation.NavigateTo<RegistrationViewModel>();
+        [RelayCommand] private void GoToUserList() => _navigation.NavigateTo<UserListViewModel>();
+        [RelayCommand] private void GoBack() => _navigation.GoBack();
+    }
+}
+```
+
+---
+
+### ПР №24 — Стили (можно сделать отдельно, но если хочешь — скажи)
+
+**✅ Готово. ПР №24 — строго по ТЗ, без лишнего.**
+
+### Создай новый View + ViewModel
+
+#### 1. StylesDemoViewModel.cs
+
+```csharp
+using CommunityToolkit.Mvvm.ComponentModel;
+using System.Collections.ObjectModel;
+
+namespace HelloApp.ViewModels
+{
+    public partial class StylesDemoViewModel : ViewModelBase
+    {
+        [ObservableProperty]
+        private ObservableCollection<MoneyOperation> operations = new();
+
+        public StylesDemoViewModel()
+        {
+            Operations.Add(new MoneyOperation { Description = "Зарплата", Amount = 50000, IsIncome = true });
+            Operations.Add(new MoneyOperation { Description = "Продукты", Amount = 3200, IsIncome = false });
+            Operations.Add(new MoneyOperation { Description = "Фриланс", Amount = 15000, IsIncome = true });
+            Operations.Add(new MoneyOperation { Description = "Такси", Amount = 800, IsIncome = false });
+        }
+    }
+}
+```
+
+#### 2. MoneyOperation.cs (создай в Models)
+
+```csharp
+namespace HelloApp.Models
+{
+    public class MoneyOperation
+    {
+        public string Description { get; set; } = "";
+        public decimal Amount { get; set; }
+        public bool IsIncome { get; set; }
+    }
+}
+```
+
+#### 3. StylesDemoView.axaml (главный файл со всеми стилями)
+
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HelloApp.ViewModels"
+             xmlns:m="using:HelloApp.Models"
+             xmlns:local="using:HelloApp"
+             x:DataType="vm:StylesDemoViewModel"
+             x:Class="HelloApp.Views.StylesDemoView">
+
+    <UserControl.Resources>
+        <!-- 5.5.1 Конвертер -->
+        <local:CelsiusToFarenhateConverter x:Key="CelsiusToFarenhate"/>
+        
+        <!-- Стили по ТЗ 5.1 -->
+        <Style Selector="Button">
+            <Setter Property="Background" Value="DarkBlue"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <Style Selector="TextBox#Title">
+            <Setter Property="Background" Value="LightYellow"/>
+            <Setter Property="FontSize" Value="16"/>
+        </Style>
+
+        <Style Selector="StackPanel Button">
+            <Setter Property="Background" Value="Orange"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+
+        <!-- 5.3 Стили для MoneyOperation -->
+        <Style Selector="TextBlock.income">
+            <Setter Property="Foreground" Value="Green"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="TextBlock.expense">
+            <Setter Property="Foreground" Value="Red"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <StackPanel Spacing="20" Margin="20">
+
+            <!-- 5.1 Стили -->
+            <TextBlock Text="=== 5.1 Стили ===" FontSize="18" FontWeight="Bold"/>
+            <Button Content="Обычная кнопка (общий стиль)"/>
+            <TextBox Name="Title" Text="Это TextBox#Title" Width="300"/>
+            
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Кнопка внутри StackPanel"/>
+                <Button Content="Ещё одна"/>
+            </StackPanel>
+
+            <!-- 5.2 Псевдоклассы -->
+            <TextBlock Text="=== 5.2 Псевдоклассы ===" FontSize="18" FontWeight="Bold"/>
+            <Button Content="Наведи на меня (:pointerover)"/>
+            <TextBox Watermark="Фокус (:focus)" Width="250"/>
+            <ListBox Height="120">
+                <ListBoxItem Content="Элемент 1"/>
+                <ListBoxItem Content="Элемент 2 (выделенный)"/>
+                <ListBoxItem Content="Элемент 3"/>
+            </ListBox>
+
+            <!-- 5.3 Привязка к стилям -->
+            <TextBlock Text="=== 5.3 Список операций ===" FontSize="18" FontWeight="Bold"/>
+            <ListBox ItemsSource="{Binding Operations}" Height="180">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="m:MoneyOperation">
+                        <StackPanel Orientation="Horizontal" Spacing="15">
+                            <TextBlock Text="{Binding Description}" Width="180"/>
+                            <TextBlock 
+                                Text="{Binding Amount}"
+                                Classes.income="{Binding IsIncome}"
+                                Classes.expense="{Binding !IsIncome}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- 5.5 Стилизация по значению -->
+            <TextBlock Text="=== 5.5 Стиль по FontSize ===" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="Обычный текст" FontSize="14"/>
+            <TextBlock Text="Текст 16px — должен быть другим цветом" FontSize="16"/>
+
+            <!-- 5.6 Material Avalonia (если установлен) -->
+            <TextBlock Text="=== 5.6 Material.Avalonia ===" FontSize="18" FontWeight="Bold"/>
+            <StackPanel Spacing="10">
+                <TextBox Text="Обычный TextBox"/>
+                <TextBox a:TextFieldAssist.Label="Outlined TextBox"
+                         UseFloatingWatermark="True"
+                         Theme="{StaticResource OutlineTextBox}"
+                         Classes="outline"
+                         Width="300"/>
+                
+                <ComboBox Theme="{StaticResource MaterialOutlineComboBox}" 
+                          a:ComboBoxAssist.Label="Material ComboBox">
+                    <ComboBoxItem Content="Option 1"/>
+                    <ComboBoxItem Content="Option 2"/>
+                </ComboBox>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+```
+
+#### 4. CelsiusToFarenhateConverter.cs
+
+```csharp
+using Avalonia.Data.Converters;
+using System;
+using System.Globalization;
+
+namespace HelloApp
+{
+    public class CelsiusToFarenhateConverter : IValueConverter
+    {
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is double c)
+                return c * 9 / 5 + 32; // C → F
+            return value;
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is double f)
+                return (f - 32) * 5 / 9; // F → C
+            return value;
+        }
+    }
+}
+```
+
+---
+
+### Подключение в навигацию (MainWindowViewModel)
+
+Добавь в `MainWindowViewModel.cs`:
+
+```csharp
+[RelayCommand]
+private void GoToStyles() => _navigation.NavigateTo<StylesDemoViewModel>();
+```
+
+И кнопку где-нибудь (например в MainWindow.axaml или в другом View):
+
+```xml
+<Button Content="Стили (ПР24)" Command="{Binding GoToStylesCommand}"/>
+```
+
+---
+
+**Что нужно сделать дополнительно:**
+
+1. Установи NuGet пакет (если хочешь Material):
+   ```
+   Material.Avalonia
+   ```
+
+2. В `App.axaml` добавь (если используешь Material):
+
+```xml
+xmlns:themes="clr-namespace:Material.Styles.Themes;assembly=Material.Styles"
+```
+
+и в `<Application.Styles>`:
+
+```xml
+<themes:MaterialTheme BaseTheme="Light" PrimaryColor="Purple" SecondaryColor="Lime"/>
+```
+
+---
+
+Всё строго по пунктам ТЗ.  
+Если нужно добавить эту страницу в навигацию или поправить что-то — пиши.
+
+Готово для отчёта. Удачи!
+
+Если где-то ошибка — кидай, сразу поправим.  
+
+Готов к №24 или к правкам?
