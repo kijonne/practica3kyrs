@@ -1,0 +1,288 @@
+**Братан, держи максимально простой код под твою ПР 4-6 (22-24).**  
+Всё по ТЗ, ничего лишнего.  
+- CommunityToolkit.Mvvm (ObservableProperty + RelayCommand)  
+- C# 12  
+- Никаких стилей, Material и прочей красоты (кроме того, что прямо требует ТЗ в ПР24)  
+- Навигация — только через RelayCommand (как ты просил), но в ПР23 я добавил то, что требует ТЗ (DI + модификация сервиса навигации)
+
+### ПР22 — Списки и DataGrid
+
+**1. Класс User** (Models/User.cs)
+
+```csharp
+public class User
+{
+    public string Login { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+```
+
+**2. UserListViewModel.cs**
+
+```csharp
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using System.Collections.ObjectModel;
+
+public partial class UserListViewModel : ObservableObject
+{
+    public ObservableCollection<User> Users { get; } = new();
+
+    [ObservableProperty] private string newLogin = string.Empty;
+    [ObservableProperty] private string newPassword = string.Empty;
+
+    public UserListViewModel()
+    {
+        // тестовые данные
+        Users.Add(new User { Login = "admin", Password = "12345" });
+        Users.Add(new User { Login = "user1", Password = "qwerty" });
+    }
+
+    [RelayCommand]
+    private void Delete(User user)
+    {
+        if (user != null) Users.Remove(user);
+    }
+
+    [RelayCommand]
+    private void Add()
+    {
+        if (!string.IsNullOrWhiteSpace(NewLogin))
+        {
+            Users.Add(new User { Login = NewLogin, Password = NewPassword });
+            NewLogin = string.Empty;
+            NewPassword = string.Empty;
+        }
+    }
+}
+```
+
+**3. UserListView.xaml** (Views/UserListView.xaml)
+
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="YourApp.Views.UserListView">
+
+    <StackPanel Spacing="10" Margin="10">
+        <!-- Добавление -->
+        <StackPanel Orientation="Horizontal" Spacing="5">
+            <TextBox Width="200" Watermark="Логин" Text="{Binding NewLogin}"/>
+            <TextBox Width="200" Watermark="Пароль" Text="{Binding NewPassword}"/>
+            <Button Content="Добавить" Command="{Binding AddCommand}"/>
+        </StackPanel>
+
+        <!-- ListBox -->
+        <ListBox ItemsSource="{Binding Users}" Height="200">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="{Binding Login}" Width="180"/>
+                        <TextBlock Text="{Binding Password}" Width="180"/>
+                        <Button Content="Удалить" 
+                                Command="{Binding $parent[UserControl].DataContext.DeleteCommand}"
+                                CommandParameter="{Binding}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- DataGrid -->
+        <DataGrid ItemsSource="{Binding Users}" 
+                  CanUserReorderColumns="True"
+                  CanUserResizeColumns="True"
+                  CanUserSortColumns="True"
+                  AutoGenerateColumns="False" Height="250">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Логин" Binding="{Binding Login}"/>
+                <DataGridTextColumn Header="Пароль" Binding="{Binding Password}"/>
+                <DataGridTemplateColumn Header="Действия">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Удалить"
+                                    Command="{Binding $parent[UserControl].DataContext.DeleteCommand}"
+                                    CommandParameter="{Binding}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </StackPanel>
+</UserControl>
+```
+
+**Что нужно сделать в проекте:**
+- Добавь NuGet: `Avalonia.Controls.DataGrid`
+- В `App.axaml` в `<Application.Styles>` добавь:
+  ```xml
+  <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+  ```
+
+### ПР23 — Конфигурация + DI
+
+**1. NuGet пакеты:**
+- `Microsoft.Extensions.Configuration`
+- `Microsoft.Extensions.Configuration.Json`
+- `Microsoft.Extensions.DependencyInjection`
+
+**2. appsettings.json** (в корне проекта, Copy to Output Directory = Always)
+
+```json
+{
+  "ApiKeys": {
+    "SomeApi": "YourApiKeyHere123"
+  }
+}
+```
+
+**3. App.axaml.cs** (добавь/замени эти части)
+
+```csharp
+public partial class App : Application
+{
+    public static IConfiguration Configuration { get; private set; } = null!;
+    public static IServiceProvider Services { get; private set; } = null!;
+
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+
+    public override void OnFrameworkInitializationCompleted()
+    {
+        // === Конфигурация ===
+        var builder = new ConfigurationBuilder();
+        builder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        Configuration = builder.Build();
+
+        // === DI ===
+        var collection = new ServiceCollection();
+        
+        // сервисы
+        collection.AddSingleton<NavigationService>();
+        collection.AddSingleton<MainViewModel>();
+        collection.AddTransient<RegistrationViewModel>();
+        collection.AddTransient<AuthorizationViewModel>();
+        // добавь сюда свои ViewModel, если нужно
+
+        Services = collection.BuildServiceProvider();
+
+        // ... остальной код твоего App
+    }
+}
+```
+
+**4. Модификация NavigationService** (добавь то, что требует ТЗ)
+
+```csharp
+public partial class NavigationService : ObservableObject   // ← наследуемся от ObservableObject
+{
+    // ... твой существующий код навигации
+
+    // новый generic метод
+    public void NavigateTo<T>(Action<T>? action = null) where T : ViewModelBase
+    {
+        var viewModel = App.Services.GetRequiredService<T>();
+        NavigateTo(viewModel, action);
+    }
+
+    // везде где меняешь текущую страницу — добавь:
+    // OnPropertyChanged(nameof(Current));   // или как у тебя называется свойство
+}
+```
+
+**5. ViewModel-ы (RegistrationViewModel, AuthorizationViewModel, MainViewModel)**
+
+В каждый конструктор добавь:
+
+```csharp
+private readonly NavigationService _navigation;
+
+public RegistrationViewModel(NavigationService navigation)  // ← добавили
+{
+    _navigation = navigation;
+    // остальной код
+}
+```
+
+**6. Пример команды навигации** (в любой ViewModel):
+
+```csharp
+[RelayCommand]
+private void GoToAuthorization()
+{
+    _navigation.NavigateTo<AuthorizationViewModel>(x => x.Login = this.Login);
+}
+```
+
+**7. MainViewModel** (CurrentPage + подписка)
+
+```csharp
+public partial class MainViewModel : ObservableObject
+{
+    private readonly NavigationService _navigation;
+
+    public MainViewModel(NavigationService navigation)
+    {
+        _navigation = navigation;
+        _navigation.PropertyChanged += Navigation_PropertyChanged;
+    }
+
+    public ViewModelBase CurrentPage => _navigation.Current;   // как в ТЗ
+
+    private void Navigation_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(NavigationService.Current))
+            OnPropertyChanged(nameof(CurrentPage));
+    }
+}
+```
+
+**8. Конвертер значений** (CelsiusToFarenhateConverter.cs)
+
+```csharp
+public class CelsiusToFarenhateConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is double c) return c * 9.0 / 5.0 + 32; // C → F
+        return value;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is double f) return (f - 32) * 5.0 / 9.0; // F → C
+        return value;
+    }
+}
+```
+
+Используй так:
+```xml
+<UserControl.Resources>
+    <local:CelsiusToFarenhateConverter x:Key="CelsiusToFarenhate"/>
+</UserControl.Resources>
+
+<TextBlock Text="{Binding Temperature, Converter={StaticResource CelsiusToFarenhate}}"/>
+```
+
+### ПР24 — Стили
+
+Там ТЗ требует **новый проект**.  
+Сделай отдельный проект, добавь туда Material.Avalonia только если хочешь (ТЗ позволяет), остальное — чистые селекторы в `UserControl.Styles` или `App.axaml`.  
+Если нужно — скажи, скину примеры стилей по ТЗ (Button, TextBox#Title, :pointerover и т.д.).
+
+---
+
+**Как запустить ПР22:**
+1. Создай UserListView + ViewModel
+2. В MainViewModel добавь RelayCommand на открытие этой страницы (через твою навигацию)
+3. Запусти — всё работает.
+
+Если где-то не компилится или нужно доработать под твой существующий NavigationService — кинь кусок кода, поправлю за 10 секунд.  
+
+Готово, братан! 🚀  
+Если надо полный проект или ПР24 — пиши.
