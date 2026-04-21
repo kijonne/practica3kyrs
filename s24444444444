@@ -1,0 +1,229 @@
+**Братан, вот полностью по порядку, чисто и без лишнего.**
+
+### Проект 1 (основной — пункты 5.1-5.5)
+
+**1. Создай новый Avalonia UI App проект**
+
+---
+
+#### `App.axaml`
+```xml
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AvaloniaStylesLab.App"
+             RequestedThemeVariant="Light">
+    
+    <Application.Styles>
+        <!-- Стили добавляем в MainWindow -->
+    </Application.Styles>
+</Application>
+```
+
+---
+
+#### `MoneyOperation.cs`
+```csharp
+public class MoneyOperation
+{
+    public string Description { get; set; } = "";
+    public decimal Amount { get; set; }
+    public bool IsIncome { get; set; }
+}
+```
+
+---
+
+#### `MainWindow.axaml`
+```xml
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="750"
+        x:Class="AvaloniaStylesLab.MainWindow"
+        Title="Практика 24 - Стили Avalonia">
+
+    <Window.Styles>
+        <!-- 5.1.1 Общий стиль для всех Button -->
+        <Style Selector="Button">
+            <Setter Property="Background" Value="#6200EE"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <!-- 5.1.3 TextBox#Title -->
+        <Style Selector="TextBox#Title">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <!-- 5.1.4 Button внутри StackPanel -->
+        <Style Selector="StackPanel Button">
+            <Setter Property="Background" Value="#03DAC6"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+
+        <!-- 5.1.5 Italic TextBlock -->
+        <Style Selector="TextBlock.ItalicText">
+            <Setter Property="FontStyle" Value="Italic"/>
+        </Style>
+
+        <!-- 5.2.1 Hover на кнопку -->
+        <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#3700B3"/>
+        </Style>
+
+        <!-- 5.2.2 Focus у TextBox -->
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="Orange"/>
+            <Setter Property="BorderThickness" Value="3"/>
+        </Style>
+
+        <!-- 5.2.3 Selected ListBoxItem -->
+        <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#BB86FC"/>
+        </Style>
+
+        <!-- 5.2.4 Чётные элементы ListBox -->
+        <Style Selector="ListBoxItem:nth-child(even)">
+            <Setter Property="Background" Value="#F0F0F0"/>
+        </Style>
+
+        <!-- 5.3.1 Два стиля для TextBlock -->
+        <Style Selector="TextBlock.class1">
+            <Setter Property="Foreground" Value="Green"/>
+        </Style>
+        <Style Selector="TextBlock.class2">
+            <Setter Property="Foreground" Value="Red"/>
+        </Style>
+
+        <!-- 5.3.3 MoneyOperation -->
+        <Style Selector="TextBlock.MoneySum">
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="TextBlock.MoneySum[IsIncome=True]">
+            <Setter Property="Foreground" Value="LimeGreen"/>
+        </Style>
+        <Style Selector="TextBlock.MoneySum[IsIncome=False]">
+            <Setter Property="Foreground" Value="Red"/>
+        </Style>
+
+        <!-- 5.5.1 TextBlock с FontSize=16 -->
+        <Style Selector="TextBlock[FontSize=16]">
+            <Setter Property="Foreground" Value="Blue"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </Window.Styles>
+
+    <StackPanel Margin="30" Spacing="15">
+        <TextBox Name="Title" Text="Это заголовок (TextBox#Title)"/>
+
+        <Button Content="Обычная кнопка"/>
+        
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="Кнопка внутри StackPanel"/>
+        </StackPanel>
+
+        <TextBlock Text="Это italic текст" Classes="ItalicText"/>
+        <TextBlock Text="Обычный текст class1" Classes="class1"/>
+        <TextBlock Text="Обычный текст class2" Classes="class2"/>
+        <TextBlock Text="Текст размером 16" FontSize="16"/>
+
+        <TextBox Text="Обычный TextBox"/>
+        <TextBox Text="TextBox в фокусе (кликни)"/>
+
+        <ListBox Width="400" Height="180">
+            <ListBoxItem Content="Элемент 1"/>
+            <ListBoxItem Content="Элемент 2"/>
+            <ListBoxItem Content="Элемент 3"/>
+            <ListBoxItem Content="Элемент 4"/>
+        </ListBox>
+
+        <!-- 5.3.3 Список MoneyOperation -->
+        <ListBox ItemsSource="{Binding Operations}" Width="450" Height="200">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <TextBlock Text="{Binding Description}" Width="220"/>
+                        <TextBlock Text="{Binding Amount, StringFormat={}{0} ₽}" 
+                                   Classes="MoneySum"
+                                   IsIncome="{Binding IsIncome}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </StackPanel>
+</Window>
+```
+
+---
+
+#### `MainWindow.axaml.cs`
+```csharp
+using Avalonia.Controls;
+using System.Collections.Generic;
+
+namespace AvaloniaStylesLab;
+
+public partial class MainWindow : Window
+{
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        var operations = new List<MoneyOperation>
+        {
+            new MoneyOperation { Description = "Зарплата", Amount = 85000, IsIncome = true },
+            new MoneyOperation { Description = "Продукты", Amount = 3200, IsIncome = false },
+            new MoneyOperation { Description = "Фриланс", Amount = 25000, IsIncome = true },
+            new MoneyOperation { Description = "Такси", Amount = 950, IsIncome = false }
+        };
+
+        DataContext = new { Operations = operations };
+    }
+}
+```
+
+---
+
+### Проект 2 (5.6 — Material.Avalonia)
+
+Создай **отдельный новый проект**, добавь пакет:
+```bash
+dotnet add package Material.Avalonia
+```
+
+**App.axaml**
+```xml
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:themes="clr-namespace:Material.Styles.Themes;assembly=Material.Styles"
+             x:Class="AvaloniaMaterial.App"
+             RequestedThemeVariant="Light">
+
+    <Application.Styles>
+        <themes:MaterialTheme BaseTheme="Light" 
+                              PrimaryColor="Purple" 
+                              SecondaryColor="Lime"/>
+    </Application.Styles>
+</Application>
+```
+
+**MainWindow.axaml** (просто пример)
+```xml
+<Window ... Title="Material Avalonia">
+    <StackPanel Margin="30" Spacing="20">
+        <TextBlock Text="Material Avalonia Example" FontSize="18" FontWeight="Bold"/>
+        <TextBox Text="Обычный TextBox"/>
+        <TextBox Text="Outlined" UseFloatingWatermark="True" Classes="outline dense"/>
+        <Button Content="Material Button"/>
+    </StackPanel>
+</Window>
+```
+
+---
+
+Теперь всё строго по ТЗ, по порядку, одним куском.  
+Копируй → вставляй → запускай.
+
+Если что-то не работает — пиши, что именно.
