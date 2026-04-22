@@ -1,0 +1,39 @@
+В `Weather.cs` добавь два вспомогательных свойства прямо в класс:
+
+```csharp
+// Давление в мм рт.ст.
+public string PressureMmHg => $"{(int)(Pressure * 0.750064)} мм рт.ст.";
+
+// Направление ветра
+public string WindDirectionText => (int)WindDirection switch
+{
+    <= 22 or > 337  => "Северный",
+    <= 67           => "Северо-восточный",
+    <= 112          => "Восточный",
+    <= 157          => "Юго-восточный",
+    <= 202          => "Южный",
+    <= 247          => "Юго-западный",
+    <= 292          => "Западный",
+    _               => "Северо-западный"
+};
+```
+
+Потом в `WeatherView.axaml` замени строки давления и ветра:
+
+```xml
+<!-- Давление -->
+<TextBlock>
+    <Run Text="Давление: "/>
+    <Run Text="{Binding PressureMmHg}"/>
+</TextBlock>
+
+<!-- Ветер -->
+<TextBlock>
+    <Run Text="Ветер: "/>
+    <Run Text="{Binding WindDirectionText}"/>
+    <Run Text=" "/>
+    <Run Text="{Binding WindSpeed, StringFormat='{}{0:F1} м/с'}"/>
+</TextBlock>
+```
+
+Всё — никаких конвертеров, свойства прямо в модели 👌
