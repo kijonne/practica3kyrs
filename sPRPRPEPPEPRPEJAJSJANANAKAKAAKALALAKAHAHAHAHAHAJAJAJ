@@ -1,0 +1,266 @@
+Да, просто ждать — код верный!
+
+---
+
+# ПР №27 — доработка WeatherApp
+
+Напомню что надо по ТЗ:
+- Поле ввода + кнопка Поиск + **список городов** + **список карточек погоды**
+- WrapPanel для карточек внутри ScrollViewer
+- Кнопки **Обновить** и **Удалить** на карточке
+- Сохранение списка городов через `Preferences`
+- Загрузка при старте
+
+---
+
+## Шаг 1 — `WeatherViewModel.cs` — полностью заменяй
+
+```csharp
+using CommunityToolkit.Mvvm.Input;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
+using WeatherApp.Extensions;
+using WeatherApp.Models;
+using WeatherApp.Services;
+
+namespace WeatherApp.ViewModels
+{
+    public partial class WeatherViewModel : ViewModelBase
+    {
+        WeatherService _weatherService;
+
+        // Поле ввода
+        private string _cityInput = string.Empty;
+        public string CityInput
+        {
+            get => _cityInput;
+            set => SetProperty(ref _cityInput, value);
+        }
+
+        // Список найденных городов (после поиска)
+        public ObservableCollection<City> FoundCities { get; } = new();
+
+        // Выбранный город из списка
+        private City? _selectedCity;
+        public City? SelectedCity
+        {
+            get => _selectedCity;
+            set
+            {
+                SetProperty(ref _selectedCity, value);
+                // Когда выбрали город — добавляем карточку
+                if (value != null)
+                    _ = AddWeatherCardAsync(value);
+            }
+        }
+
+        // Список карточек погоды
+        public ObservableCollection<Weather> WeatherCards { get; } = new();
+
+        public WeatherViewModel(WeatherService weatherService)
+        {
+            _weatherService = weatherService;
+
+            // Загружаем сохранённые города при старте
+            InitializationTask = Task.Run(async () =>
+            {
+                var savedCities = await Preferences.Load<List<City>>("cities", new List<City>());
+                foreach (var city in savedCities)
+                {
+                    var weather = await _weatherService.GetWeatherByGeoAsync(city.Latitude, city.Longitude);
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => WeatherCards.Add(weather));
+                }
+            });
+        }
+
+        TaskNotifier? _initializationTask;
+        public Task? InitializationTask
+        {
+            get => _initializationTask;
+            set => SetPropertyAndNotifyOnCompletion(ref _initializationTask, value);
+        }
+
+        // Кнопка Поиск — ищет города по названию
+        [RelayCommand]
+        private async Task SearchAsync()
+        {
+            if (string.IsNullOrWhiteSpace(CityInput)) return;
+            try
+            {
+                var cities = await _weatherService.GetGeoByCityNameAsync(CityInput, 5);
+                FoundCities.Clear();
+                foreach (var c in cities)
+                    FoundCities.Add(c);
+            }
+            catch { }
+        }
+
+        // Добавление карточки погоды по выбранному городу
+        private async Task AddWeatherCardAsync(City city)
+        {
+            try
+            {
+                var weather = await _weatherService.GetWeatherByGeoAsync(city.Latitude, city.Longitude);
+                WeatherCards.Add(weather);
+                await SaveCitiesAsync();
+            }
+            catch { }
+        }
+
+        // Кнопка Удалить на карточке
+        [RelayCommand]
+        private async Task DeleteCard(Weather weather)
+        {
+            WeatherCards.Remove(weather);
+            await SaveCitiesAsync();
+        }
+
+        // Кнопка Обновить на карточке
+        [RelayCommand]
+        private async Task RefreshCard(Weather weather)
+        {
+            try
+            {
+                var updated = await _weatherService.GetWeatherByGeoAsync(
+                    weather.City.Latitude, weather.City.Longitude);
+                var index = WeatherCards.IndexOf(weather);
+                if (index >= 0)
+                    WeatherCards[index] = updated;
+            }
+            catch { }
+        }
+
+        // Сохраняем список городов
+        private async Task SaveCitiesAsync()
+        {
+            var cities = WeatherCards.Select(w => w.City).ToList();
+            await Preferences.Save("cities", cities);
+        }
+    }
+}
+```
+
+---
+
+## Шаг 2 — `WeatherView.axaml` — полностью заменяй
+
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:WeatherApp.ViewModels"
+             xmlns:m="clr-namespace:WeatherApp.Models"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="WeatherApp.Views.WeatherView"
+             x:DataType="vm:WeatherViewModel">
+
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="m:Weather">
+            <Border BorderBrush="Gray" BorderThickness="1"
+                    CornerRadius="8" Padding="12" Margin="4" Width="200">
+                <StackPanel Spacing="4">
+
+                    <!-- Иконка + город -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Image Source="{Binding Image^}" Width="40" Height="40"/>
+                        <TextBlock Text="{Binding City.Name}"
+                                   FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding Description}"/>
+
+                    <TextBlock>
+                        <Run Text="Температура: "/>
+                        <Run Text="{Binding Temperature, StringFormat='{}{0:F0} °C'}"/>
+                    </TextBlock>
+
+                    <TextBlock>
+                        <Run Text="Ощущается: "/>
+                        <Run Text="{Binding FeelsAsTemperature, StringFormat='{}{0:F0} °C'}"/>
+                    </TextBlock>
+
+                    <TextBlock>
+                        <Run Text="Давление: "/>
+                        <Run Text="{Binding Pressure, StringFormat='{}{0:F0} гПа'}"/>
+                    </TextBlock>
+
+                    <TextBlock>
+                        <Run Text="Влажность: "/>
+                        <Run Text="{Binding Humidity, StringFormat='{}{0:F0} %'}"/>
+                    </TextBlock>
+
+                    <TextBlock>
+                        <Run Text="Ветер: "/>
+                        <Run Text="{Binding WindSpeed, StringFormat='{}{0:F1} м/с'}"/>
+                    </TextBlock>
+
+                    <TextBlock>
+                        <Run Text="Облачность: "/>
+                        <Run Text="{Binding Cloudiness, StringFormat='{}{0:F0} %'}"/>
+                    </TextBlock>
+
+                    <!-- Кнопки Обновить и Удалить -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,8,0,0">
+                        <Button Content="Обновить"
+                                Command="{Binding $parent[UserControl].DataContext.RefreshCardCommand}"
+                                CommandParameter="{Binding}"/>
+                        <Button Content="Удалить"
+                                Command="{Binding $parent[UserControl].DataContext.DeleteCardCommand}"
+                                CommandParameter="{Binding}"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- Строка 1: поле ввода + кнопка поиск -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="10">
+            <TextBox Watermark="Введите город" Text="{Binding CityInput}" Width="250"/>
+            <Button Content="Поиск" Command="{Binding SearchCommand}"/>
+        </StackPanel>
+
+        <!-- Строка 2: список найденных городов -->
+        <ListBox Grid.Row="1" Margin="10,0,10,10"
+                 ItemsSource="{Binding FoundCities}"
+                 SelectedItem="{Binding SelectedCity}"
+                 MaxHeight="120">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="m:City">
+                    <TextBlock>
+                        <Run Text="{Binding Name}"/>
+                        <Run Text=", "/>
+                        <Run Text="{Binding Country}"/>
+                    </TextBlock>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Строка 3: карточки погоды в ScrollViewer + WrapPanel -->
+        <ScrollViewer Grid.Row="2">
+            <ItemsControl ItemsSource="{Binding WeatherCards}" Margin="10">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>
+```
+
+---
+
+## Что происходит по шагам:
+
+1. Вводишь город → жмёшь **Поиск** → заполняется список городов под полем ввода
+2. Выбираешь город из списка → автоматически добавляется карточка погоды
+3. Город сохраняется в `Preferences` — при следующем запуске карточки загрузятся сами
+4. На каждой карточке **Обновить** (перезапрашивает погоду) и **Удалить** (убирает карточку и из сохранения)
+
+Больше ничего не трогаешь — всё остальное от препода остаётся как есть 👌
