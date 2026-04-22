@@ -1,0 +1,254 @@
+Щас распакую и изучу!Отлично, теперь всё ясно! Картина такая:
+
+**Что уже есть от препода:**
+- `Weather.cs`, `City.cs` — модели готовы
+- `WeatherJsonConverter`, `CityJsonConverter` — парсинг JSON готов
+- `ImageHelper.LoadFromWeb` — готов
+- `Preferences` — готов
+- `WeatherViewModel` — заготовка с `InitializationTask`
+- `WeatherView.axaml` — пустой `DataTemplate` и пустой `Grid`
+
+**Что нужно сделать тебе:**
+1. `WeatherService` — реализовать 3 метода (там `throw new NotImplementedException()`)
+2. `WeatherViewModel` — добавить свойства и команды
+3. `WeatherView.axaml` — заполнить DataTemplate и Grid
+
+---
+
+# ПР №26 — Что именно писать
+
+## 1. `appsettings.json` — вставь свой ключ
+
+```json
+{
+  "ApiKeys": {
+    "WeatherApi": "сюда_свой_ключ"
+  }
+}
+```
+
+---
+
+## 2. `Services/WeatherService.cs` — реализуй 3 метода
+
+Заменяешь три `throw new NotImplementedException()` на реальный код:
+
+```csharp
+public async Task<Weather> GetWeatherByCityNameAsync(string cityName)
+{
+    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+    options.Converters.Add(new WeatherJsonConverter());
+
+    using var http = new HttpClient();
+    var url = $"https://api.openweathermap.org/data/2.5/weather?q={cityName}&appid={_apiKey}&units=metric&lang=ru";
+    var response = await http.GetStringAsync(url);
+    return JsonSerializer.Deserialize<Weather>(response, options)!;
+}
+
+public async Task<Weather> GetWeatherByGeoAsync(double latitude, double longitude)
+{
+    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+    options.Converters.Add(new WeatherJsonConverter());
+
+    using var http = new HttpClient();
+    var url = $"https://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid={_apiKey}&units=metric&lang=ru";
+    var response = await http.GetStringAsync(url);
+    return JsonSerializer.Deserialize<Weather>(response, options)!;
+}
+
+public async Task<List<City>> GetGeoByCityNameAsync(string cityName, int limit = 1)
+{
+    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+    options.Converters.Add(new CityJsonConverter());
+
+    using var http = new HttpClient();
+    var url = $"https://api.openweathermap.org/geo/1.0/direct?q={cityName}&limit={limit}&appid={_apiKey}";
+    var response = await http.GetStringAsync(url);
+    return JsonSerializer.Deserialize<List<City>>(response, options)!;
+}
+```
+
+Всё просто — `GetStringAsync` скачивает JSON строкой, `JsonSerializer.Deserialize` парсит через конвертеры препода.
+
+---
+
+## 3. `ViewModels/WeatherViewModel.cs` — добавь свойства и команду
+
+```csharp
+using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using System;
+using System.Threading.Tasks;
+using WeatherApp.Extensions;
+using WeatherApp.Models;
+using WeatherApp.Services;
+
+namespace WeatherApp.ViewModels
+{
+    public partial class WeatherViewModel : ViewModelBase
+    {
+        WeatherService _weatherService;
+
+        [ObservableProperty] private string _cityInput = string.Empty;
+        [ObservableProperty] private Weather? _currentWeather;
+
+        public WeatherViewModel(WeatherService weatherService)
+        {
+            _weatherService = weatherService;
+            InitializationTask = Task.Run(async () => { });
+        }
+
+        TaskNotifier? _initializationTask;
+        public Task? InitializationTask
+        {
+            get => _initializationTask;
+            set => SetPropertyAndNotifyOnCompletion(ref _initializationTask, value);
+        }
+
+        [RelayCommand]
+        private async Task SearchAsync()
+        {
+            if (string.IsNullOrWhiteSpace(CityInput)) return;
+            try
+            {
+                CurrentWeather = await _weatherService.GetWeatherByCityNameAsync(CityInput);
+            }
+            catch { }
+        }
+    }
+}
+```
+
+---
+
+## 4. `Views/WeatherView.axaml` — заполни DataTemplate и Grid
+
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:WeatherApp.ViewModels"
+             xmlns:m="clr-namespace:WeatherApp.Models"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="WeatherApp.Views.WeatherView"
+             x:DataType="vm:WeatherViewModel">
+
+    <UserControl.DataTemplates>
+        <!-- Карточка погоды — заполняем как требует ТЗ -->
+        <DataTemplate DataType="m:Weather">
+            <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="8" Padding="12" Margin="4">
+                <StackPanel Spacing="4">
+
+                    <!-- Иконка + название города -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Image Source="{Binding Image^}" Width="50" Height="50"/>
+                        <TextBlock Text="{Binding City.Name}" FontSize="18" FontWeight="Bold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Описание -->
+                    <TextBlock Text="{Binding Description}"/>
+
+                    <!-- Температура -->
+                    <TextBlock>
+                        <Run Text="Температура: "/>
+                        <Run Text="{Binding Temperature, StringFormat='{}{0:F0} °C'}"/>
+                    </TextBlock>
+
+                    <!-- Ощущается -->
+                    <TextBlock>
+                        <Run Text="Ощущается как: "/>
+                        <Run Text="{Binding FeelsAsTemperature, StringFormat='{}{0:F0} °C'}"/>
+                    </TextBlock>
+
+                    <!-- Давление — переводим гПа в мм рт.ст. через StringFormat не выйдет, 
+                         поэтому просто показываем гПа, конвертер не требует ТЗ обязательно -->
+                    <TextBlock>
+                        <Run Text="Давление: "/>
+                        <Run Text="{Binding Pressure, StringFormat='{}{0:F0} гПа'}"/>
+                    </TextBlock>
+
+                    <!-- Влажность -->
+                    <TextBlock>
+                        <Run Text="Влажность: "/>
+                        <Run Text="{Binding Humidity, StringFormat='{}{0:F0} %'}"/>
+                    </TextBlock>
+
+                    <!-- Ветер -->
+                    <TextBlock>
+                        <Run Text="Ветер: "/>
+                        <Run Text="{Binding WindSpeed, StringFormat='{}{0:F1} м/с'}"/>
+                    </TextBlock>
+
+                    <!-- Облачность -->
+                    <TextBlock>
+                        <Run Text="Облачность: "/>
+                        <Run Text="{Binding Cloudiness, StringFormat='{}{0:F0} %'}"/>
+                    </TextBlock>
+
+                    <!-- Дождь (показываем только если > 0) -->
+                    <TextBlock IsVisible="{Binding Rain, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <Run Text="Дождь: "/>
+                        <Run Text="{Binding Rain, StringFormat='{}{0:F1} мм/ч'}"/>
+                    </TextBlock>
+
+                    <!-- Снег -->
+                    <TextBlock IsVisible="{Binding Snow, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <Run Text="Снег: "/>
+                        <Run Text="{Binding Snow, StringFormat='{}{0:F1} мм/ч'}"/>
+                    </TextBlock>
+
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Поле ввода + кнопка -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="10">
+            <TextBox Watermark="Введите город" Text="{Binding CityInput}" Width="250"/>
+            <Button Content="Поиск" Command="{Binding SearchCommand}"/>
+        </StackPanel>
+
+        <!-- Карточка погоды — ContentControl сам использует DataTemplate выше -->
+        <ContentControl Grid.Row="1"
+                        Content="{Binding CurrentWeather}"
+                        Margin="10"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"/>
+
+    </Grid>
+</UserControl>
+```
+
+---
+
+## 5. Добавь свойство `Image` в `Weather.cs`
+
+ТЗ требует биндинг через `^`, значит нужно свойство-Task прямо в модели:
+
+```csharp
+using Avalonia.Media.Imaging;
+using WeatherApp.Extensions;
+
+// Добавь в класс Weather:
+public Task<Bitmap?> Image =>
+    ImageHelper.LoadFromWeb(new Uri($"https://openweathermap.org/img/wn/{Icon}@2x.png"));
+```
+
+---
+
+## Итого — что ты трогаешь:
+
+| Файл | Что делаешь |
+|------|-------------|
+| `appsettings.json` | Вставляешь свой API ключ |
+| `Models/Weather.cs` | Добавляешь свойство `Image` |
+| `Services/WeatherService.cs` | Заменяешь 3 `throw` на реальный код |
+| `ViewModels/WeatherViewModel.cs` | Добавляешь `CityInput`, `CurrentWeather`, команду `Search` |
+| `Views/WeatherView.axaml` | Заполняешь `DataTemplate` и `Grid` |
+
+Всё остальное — не трогаешь, препод уже написал. Говори когда готов — перейдём к **ПР №27**!
