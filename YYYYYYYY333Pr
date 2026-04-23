@@ -1,0 +1,96 @@
+# SQL запросы для практической работы
+
+На основе схемы БД `market` (таблицы: `books`, `authors`, `orders`, `order_items`, `customers`).
+
+---
+
+**5.1** — Все данные обо всех авторах:
+```sql
+SELECT * FROM authors;
+```
+
+---
+
+**5.2** — Фамилия и Имя первых трёх авторов:
+```sql
+SELECT last_name, first_name FROM authors LIMIT 3;
+```
+
+---
+
+**5.3** — Страны происхождения авторов без дубликатов, по алфавиту:
+```sql
+SELECT DISTINCT country FROM authors ORDER BY country;
+```
+
+---
+
+**5.4** — Выборка о заказчиках: ID книги, название, скидка 5%, цена со скидкой:
+```sql
+SELECT 
+    book_id,
+    title,
+    5 AS discount,
+    price * 0.95 AS price_with_discount
+FROM books;
+```
+
+---
+
+**5.5** — Книги с категорией цены, по убыванию цены:
+```sql
+SELECT title, price,
+    CASE
+        WHEN price < 100 THEN 'дешевая'
+        WHEN price BETWEEN 100 AND 1000 THEN 'средняя'
+        ELSE 'дорогая'
+    END AS price_category
+FROM books
+ORDER BY price DESC;
+```
+
+---
+
+**5.6** — Логин, Фамилия, Имя, Телефон заказчиков у которых указан телефон:
+```sql
+SELECT login, last_name, first_name, phone
+FROM customers
+WHERE phone IS NOT NULL;
+```
+
+---
+
+**5.7** — Книги, содержащие слово "компьютер" в названии:
+```sql
+SELECT title FROM books WHERE title LIKE '%компьютер%';
+```
+
+---
+
+**5.8** — Минимальная, максимальная и средняя стоимость книг:
+```sql
+SELECT 
+    MIN(price) AS min_price,
+    MAX(price) AS max_price,
+    AVG(price) AS avg_price
+FROM books;
+```
+
+---
+
+**5.9** — ID автора, уникальные названия книг и количество книг под каждым названием:
+```sql
+SELECT author_id, title, COUNT(*) AS book_count
+FROM books
+GROUP BY author_id, title;
+```
+
+---
+
+**5.10** — Страны и количество авторов, где авторов больше одного:
+```sql
+SELECT country, COUNT(*) AS author_count
+FROM authors
+GROUP BY country
+HAVING COUNT(*) > 1;
+```
