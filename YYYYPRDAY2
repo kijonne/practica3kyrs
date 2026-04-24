@@ -1,0 +1,233 @@
+# Практическая работа №4
+
+**5.1** — Книги русских авторов: фамилия, имя, название, цена:
+```sql
+SELECT a.last_name, a.first_name, b.title, b.price
+FROM books b
+INNER JOIN authors a ON b.author_id = a.author_id
+WHERE a.country = 'Россия';
+```
+
+---
+
+**5.2** — Фамилия, имя автора и количество его книг:
+```sql
+SELECT a.last_name, a.first_name, COUNT(b.book_id) AS book_count
+FROM authors a
+LEFT JOIN books b ON a.author_id = b.author_id
+GROUP BY a.author_id, a.last_name, a.first_name;
+```
+
+---
+
+**5.3** — Авторы, которые НЕ писали книг со словами "linux" или "windows":
+```sql
+SELECT first_name, last_name
+FROM authors
+WHERE author_id NOT IN (
+    SELECT author_id FROM books
+    WHERE title LIKE '%linux%' OR title LIKE '%windows%'
+);
+```
+
+---
+
+**5.4** — Логин заказчика, кол-во заказов, кол-во книг, сумма трат:
+```sql
+SELECT c.login,
+    COUNT(DISTINCT o.order_id) AS order_count,
+    SUM(oi.quantity) AS books_count,
+    SUM(oi.quantity * b.price) AS total_spent
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN books b ON oi.book_id = b.book_id
+GROUP BY c.customer_id, c.login;
+```
+
+---
+
+**5.5** — Заказчики, купившие больше 10 книг:
+```sql
+SELECT c.login,
+    COUNT(DISTINCT o.order_id) AS order_count,
+    SUM(oi.quantity) AS books_count
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+JOIN order_items oi ON o.order_id = oi.order_id
+GROUP BY c.customer_id, c.login
+HAVING SUM(oi.quantity) > 10;
+```
+
+
+
+
+
+
+
+
+# Практическая работа №5
+
+**5.1** — Создать таблицу tempBooks и заполнить:
+```sql
+CREATE TABLE tempBooks (
+    last_name VARCHAR(50),
+    first_name VARCHAR(50),
+    title VARCHAR(50),
+    price DECIMAL(6,2)
+);
+
+INSERT INTO tempBooks
+SELECT a.last_name, a.first_name, b.title, b.price
+FROM books b
+INNER JOIN authors a ON b.author_id = a.author_id;
+```
+
+---
+
+**5.2** — Удалить книги со словом "компьютер":
+```sql
+DELETE FROM tempBooks WHERE title LIKE '%компьютер%';
+```
+
+---
+
+**5.3** — Лангфюс: цена вдвое, Лебрен: минус 50, остальные без изменений:
+```sql
+UPDATE tempBooks
+SET price = CASE
+    WHEN last_name = 'Лангфюс' THEN price * 2
+    WHEN last_name = 'Лебрен' THEN price - 50
+    ELSE price
+END;
+```
+
+---
+
+**5.4** — Удалить все записи из tempBooks:
+```sql
+DELETE FROM tempBooks;
+```
+
+---
+
+**5.5** — Увеличить цену книг русских авторов на 100:
+```sql
+UPDATE books b
+JOIN authors a ON b.author_id = a.author_id
+SET b.price = b.price + 100
+WHERE a.country = 'Россия';
+```
+
+---
+
+**5.6** — Удалить заказчиков без заказов:
+```sql
+DELETE FROM customers
+WHERE customer_id NOT IN (
+    SELECT DISTINCT customer_id FROM orders
+);
+```
+
+---
+
+**5.7** — Добавить автора через REPLACE:
+```sql
+REPLACE INTO authors (last_name, first_name, country)
+VALUES ('Тротциг', 'Биргитта', 'Швеция');
+```
+
+---
+
+**5.8** — Добавить автора через ON DUPLICATE KEY:
+```sql
+INSERT INTO authors (last_name, first_name, country)
+VALUES ('Тротциг', 'Биргитта', 'Швеция')
+ON DUPLICATE KEY UPDATE country = 'Швеция';
+```
+
+
+
+
+
+
+# Практическая работа №6
+
+**5.1** — Текущая БД, пользователь, дата, время:
+```sql
+SELECT DATABASE(), USER(), CURDATE(), CURTIME(), NOW();
+```
+
+---
+
+**5.2** — Заказы текущего года с датой, днём и названием месяца:
+```sql
+SELECT order_id,
+    DATE(order_datetime) AS date,
+    DAY(order_datetime) AS day,
+    MONTHNAME(order_datetime) AS month_name
+FROM orders
+WHERE YEAR(order_datetime) = YEAR(CURDATE());
+```
+
+---
+
+**5.3** — Заменить двойные пробелы на одинарные, цену округлить до десятков:
+```sql
+SELECT REPLACE(title, '  ', ' ') AS title,
+    ROUND(price, -1) AS price
+FROM books;
+```
+
+---
+
+**5.4** — Фамилия и первая буква имени автора, название и цена с валютой:
+```sql
+SELECT CONCAT(a.last_name, ' ', LEFT(a.first_name, 1), '.') AS author,
+    CONCAT_WS(' ', b.title, 'руб.', b.price) AS book_price
+FROM books b
+JOIN authors a ON b.author_id = a.author_id;
+```
+
+---
+
+**5.5** — Авторы и список их книг без повторов, по возрастанию:
+```sql
+SELECT a.last_name, a.first_name,
+    GROUP_CONCAT(DISTINCT b.title ORDER BY b.title ASC) AS books
+FROM authors a
+JOIN books b ON a.author_id = b.author_id
+GROUP BY a.author_id, a.last_name, a.first_name;
+```
+
+---
+
+**5.6** — Информация о заказчике: телефон NULL→«-», адрес NULL→«-»:
+```sql
+SELECT login, last_name, first_name,
+    IFNULL(phone, '-') AS phone,
+    IFNULL(address, '-') AS address
+FROM customers;
+```
+
+---
+
+**5.7** — Все книги с номером строки, отсортированные по названию:
+```sql
+SELECT ROW_NUMBER() OVER (ORDER BY title) AS row_num,
+    title, price
+FROM books
+ORDER BY title;
+```
+
+---
+
+**5.8** — Топ-3 самых дорогих книги по каждому жанру:
+```sql
+SELECT * FROM (
+    SELECT title, genre, price,
+        DENSE_RANK() OVER (PARTITION BY genre ORDER BY price DESC) AS price_rank
+    FROM books
+) ranked
+WHERE price_rank <= 3;
+```
