@@ -1,150 +1,145 @@
-## Практическая №8 — Транзакции
+## Практическая №9 — Планировщик событий
 
-Эта практическая выполняется **не в Workbench**, а через **командную строку MySQL**. Но если у тебя нет OpenServer — можно сделать прямо в Workbench, просто нужно одну настройку поменять.
+### Подготовка
+
+Сначала нужно включить планировщик событий. Выполни в Workbench:
+
+```sql
+SET GLOBAL event_scheduler = ON;
+```
+
+Проверь что включился:
+
+```sql
+SHOW PROCESSLIST;
+```
+
+В списке должна появиться строка с `event_scheduler`.
 
 ---
 
-### Подготовка в Workbench
-
-Сначала выбери базу и посмотри что есть таблица `authors` (Авторы). Если работаешь с БД Market — она уже должна быть. Выполни:
+### Задание 5.1.3 — Создай таблицу myEventTable
 
 ```sql
 USE market;
-SELECT * FROM authors;
-```
 
-Если такой БД нет — создай тестовую таблицу:
-
-```sql
-CREATE DATABASE IF NOT EXISTS market;
-USE market;
-
-CREATE TABLE IF NOT EXISTS authors (
-  idAuthor INT AUTO_INCREMENT PRIMARY KEY,
-  lastName VARCHAR(50) NOT NULL,
-  firstName VARCHAR(50) NOT NULL
+CREATE TABLE IF NOT EXISTS myEventTable (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  eventTime DATETIME,
+  eventName VARCHAR(50)
 );
-
-INSERT INTO authors (lastName, firstName) VALUES
-('Толстой', 'Лев'),
-('Пушкин', 'Александр'),
-('Достоевский', 'Фёдор');
-
-SELECT * FROM authors;
 ```
 
----
-
-### Задание 5.1 — Отключить автовыполнение + начать транзакцию
+Проверь:
 
 ```sql
-SET AUTOCOMMIT = 0;
-BEGIN;
+SELECT * FROM myEventTable;
 ```
-
-Теперь все изменения не сохраняются автоматически — только если ты сам напишешь COMMIT.
 
 ---
 
-### Задание 5.2 — INSERT → вывести → ROLLBACK → вывести снова
+### Задание 5.1.4 — event1 (каждые 10 секунд, 5 минут)
 
 ```sql
--- Добавляем запись
-INSERT INTO authors (lastName, firstName) VALUES ('Гоголь', 'Николай');
-
--- Смотрим — запись есть
-SELECT * FROM authors;
-
--- Откатываем транзакцию
-ROLLBACK;
-
--- Смотрим снова — записи нет, она исчезла
-SELECT * FROM authors;
+CREATE EVENT event1
+ON SCHEDULE EVERY 10 SECOND
+STARTS NOW()
+ENDS NOW() + INTERVAL 5 MINUTE
+ON COMPLETION PRESERVE
+DO
+  INSERT INTO myEventTable (eventTime, eventName)
+  VALUES (NOW(), 'event1');
 ```
 
-После ROLLBACK Гоголя не будет — это и есть суть отката.
+`ON COMPLETION PRESERVE` — значит событие не удалится из БД после завершения.
 
----
-
-### Задание 5.3 — INSERT → SAVEPOINT → посмотреть
+Подожди 30 секунд и проверь что записи появляются:
 
 ```sql
--- Снова начинаем транзакцию
-BEGIN;
-
--- Добавляем запись
-INSERT INTO authors (lastName, firstName) VALUES ('Гоголь', 'Николай');
-
--- Смотрим — запись есть
-SELECT * FROM authors;
-
--- Создаём точку сохранения
-SAVEPOINT point1;
-
--- Смотрим содержимое таблицы
-SELECT * FROM authors;
+SELECT * FROM myEventTable;
 ```
 
 ---
 
-### Задание 5.4 — UPDATE → откат к точке сохранения
+### Задание 5.2 — event2 (каждые 2 минуты 30 секунд, сутки)
 
 ```sql
--- Меняем запись
-UPDATE authors SET firstName = 'ИЗМЕНЕНО' WHERE lastName = 'Гоголь';
-
--- Смотрим — изменение есть
-SELECT * FROM authors;
-
--- Откатываемся к точке сохранения (UPDATE отменится, INSERT останется)
-ROLLBACK TO SAVEPOINT point1;
-
--- Смотрим — изменение пропало, но Гоголь всё ещё есть
-SELECT * FROM authors;
+CREATE EVENT event2
+ON SCHEDULE EVERY 150 SECOND
+STARTS NOW()
+ENDS NOW() + INTERVAL 1 DAY
+ON COMPLETION PRESERVE
+DO
+  INSERT INTO myEventTable (eventTime, eventName)
+  VALUES (NOW(), 'event2');
 ```
+
+150 секунд = 2 минуты 30 секунд.
 
 ---
 
-### Задание 5.5 — UPDATE → COMMIT → посмотреть
+### Задание 5.3 — event3 (однократно, удаляется после)
 
 ```sql
--- Снова делаем изменение
-UPDATE authors SET firstName = 'Николай' WHERE lastName = 'Гоголь';
-
--- Смотрим
-SELECT * FROM authors;
-
--- Фиксируем транзакцию — теперь изменения сохранены навсегда
-COMMIT;
-
--- Смотрим — всё зафиксировано
-SELECT * FROM authors;
+CREATE EVENT event3
+ON SCHEDULE AT NOW() + INTERVAL 1 MINUTE
+ON COMPLETION NOT PRESERVE
+DO
+  INSERT INTO myEventTable (eventTime, eventName)
+  VALUES (NOW(), 'event3');
 ```
+
+`ON COMPLETION NOT PRESERVE` — событие удалится само после выполнения. Сработает через 1 минуту.
 
 ---
 
-### Итого порядок выполнения в Workbench
+### Задание 5.4 — eventAuthor (ежедневно в 15:00, удаляет авторов без книг)
 
-Важный момент: **выполняй команды по одной** (выдели нужную строку и нажми Ctrl+Enter), а не весь блок сразу. Иначе ROLLBACK сработает раньше чем ты увидишь результат INSERT.
+```sql
+CREATE EVENT eventAuthor
+ON SCHEDULE EVERY 1 DAY
+STARTS (DATE(NOW()) + INTERVAL 15 HOUR)
+ON COMPLETION PRESERVE
+DO BEGIN
+  INSERT INTO myEventTable (eventTime, eventName)
+  VALUES (NOW(), 'eventAuthor');
+  
+  DELETE FROM authors
+  WHERE idAuthor NOT IN (SELECT DISTINCT idAuthor FROM books);
+END;
+```
 
-Порядок такой:
+Если у тебя нет таблицы `books` или называется по-другому — скажи, подправим.
 
-1. `SET AUTOCOMMIT = 0` → выполнить
-2. `BEGIN` → выполнить
-3. `INSERT ...` → выполнить
-4. `SELECT *` → выполнить, **сделать скриншот** (запись есть)
-5. `ROLLBACK` → выполнить
-6. `SELECT *` → выполнить, **скриншот** (записи нет)
-7. `BEGIN` → выполнить
-8. `INSERT ...` → выполнить
-9. `SELECT *` → скриншот
-10. `SAVEPOINT point1` → выполнить
-11. `UPDATE ...` → выполнить
-12. `SELECT *` → скриншот (изменение есть)
-13. `ROLLBACK TO SAVEPOINT point1` → выполнить
-14. `SELECT *` → скриншот (изменение пропало)
-15. `UPDATE ...` → выполнить
-16. `COMMIT` → выполнить
-17. `SELECT *` → скриншот (всё зафиксировано)
+---
 
-Скажи когда готова, разберём №9!
+### Задание 5.5 — Просмотр всех событий
+
+```sql
+SELECT * FROM information_schema.EVENTS;
+```
+
+Это покажет все созданные события с их параметрами. Для отчёта нужно объяснить столбцы:
+
+- `EVENT_NAME` — название события
+- `EVENT_TYPE` — тип: RECURRING (повторяющееся) или ONE TIME (однократное)
+- `INTERVAL_VALUE` + `INTERVAL_FIELD` — периодичность
+- `STARTS` / `ENDS` — когда начинается и заканчивается
+- `STATUS` — ENABLED (включено) или DISABLED
+- `ON_COMPLETION` — PRESERVE или NOT PRESERVE (удалять после или нет)
+- `LAST_EXECUTED` — когда последний раз выполнялось
+
+---
+
+### Итого порядок
+
+1. `SET GLOBAL event_scheduler = ON` → выполнить
+2. `SHOW PROCESSLIST` → скриншот (видно event_scheduler)
+3. Создать таблицу `myEventTable`
+4. Создать `event1` → подождать → `SELECT * FROM myEventTable` → скриншот
+5. Создать `event2`
+6. Создать `event3` → подождать минуту → `SELECT * FROM myEventTable` → скриншот (event3 сработал)
+7. Создать `eventAuthor`
+8. `SELECT * FROM information_schema.EVENTS` → скриншот для отчёта
+
+Пиши если что-то не создаётся!
