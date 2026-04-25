@@ -1,211 +1,150 @@
-Окей, поехали! Начнём с Практической №7 — полнотекстовый поиск.
+## Практическая №8 — Транзакции
+
+Эта практическая выполняется **не в Workbench**, а через **командную строку MySQL**. Но если у тебя нет OpenServer — можно сделать прямо в Workbench, просто нужно одну настройку поменять.
 
 ---
 
-## Практическая №7 — план действий
+### Подготовка в Workbench
 
-У тебя есть два SQL-файла. Их нужно выполнить в MySQL Workbench, чтобы создать таблицы. Потом будем писать запросы по заданиям.
-
-**Шаг 1 — Открой MySQL Workbench и подключись к своей БД** (обычно это localhost, пользователь root).
-
-**Шаг 2 — Создай или выбери базу данных.** В новом query-окне напиши и выполни:
+Сначала выбери базу и посмотри что есть таблица `authors` (Авторы). Если работаешь с БД Market — она уже должна быть. Выполни:
 
 ```sql
-CREATE DATABASE IF NOT EXISTS games_db;
-USE games_db;
+USE market;
+SELECT * FROM authors;
 ```
 
-**Шаг 3 — Создай таблицу games.** Скопируй содержимое файла `Games_sql.txt` в query-окно и выполни. Таблица создастся и заполнится 10 играми.
-
-**Шаг 4 — Создай таблицу video_games.** Так же — скопируй `video_games_sql.txt` и выполни.
-
----
-
-Теперь задания по порядку.
-
----
-
-### Задание 5.1 — Изменить настройки (ft_min_word_len)
-
-Раз нет OpenServer, это задание просто **проверяем командой** — выполни в Workbench:
+Если такой БД нет — создай тестовую таблицу:
 
 ```sql
-SHOW VARIABLES LIKE 'ft_min_word_len';
-```
+CREATE DATABASE IF NOT EXISTS market;
+USE market;
 
-Покажет минимальную длину слова для поиска (обычно 4). Менять конфиг не нужно, просто запиши результат для отчёта.
+CREATE TABLE IF NOT EXISTS authors (
+  idAuthor INT AUTO_INCREMENT PRIMARY KEY,
+  lastName VARCHAR(50) NOT NULL,
+  firstName VARCHAR(50) NOT NULL
+);
 
----
+INSERT INTO authors (lastName, firstName) VALUES
+('Толстой', 'Лев'),
+('Пушкин', 'Александр'),
+('Достоевский', 'Фёдор');
 
-### Задание 5.2 — Добавить полнотекстовые индексы
-
-**5.2.1 — Таблица games.**
-
-Сначала нужно изменить описания в 5 играх так, чтобы в них встречались одинаковые слова. Например, добавим слово **"война"** в разное количество раз:
-
-```sql
-USE games_db;
-
-UPDATE games SET description = 'Война и экшен — это SimCity про войну' WHERE idGame = 1;
-UPDATE games SET description = 'Война война война — три раза слово война в Titanfall' WHERE idGame = 2;
-UPDATE games SET description = 'Война война — два раза в Battlefield' WHERE idGame = 3;
-UPDATE games SET description = 'Здесь встречается слово война один раз в Sims' WHERE idGame = 4;
-UPDATE games SET description = 'Война снова появляется в Dark Souls один раз' WHERE idGame = 5;
-```
-
-Потом добавь индекс на столбец `description`:
-
-```sql
-ALTER TABLE games ADD FULLTEXT INDEX ft_description (description);
-```
-
-И индекс на два столбца сразу — `name` и `description`:
-
-```sql
-ALTER TABLE games ADD FULLTEXT INDEX ft_name_desc (name, description);
-```
-
-**5.2.2 — Таблица video_games.**
-
-Добавь индекс на столбец `Genres`:
-
-```sql
-ALTER TABLE video_games ADD FULLTEXT INDEX ft_genres (Genres);
+SELECT * FROM authors;
 ```
 
 ---
 
-### Задание 5.3 — Определение релевантности
+### Задание 5.1 — Отключить автовыполнение + начать транзакцию
 
-Здесь нужно 4 разных запроса к таблице `games` по столбцу `description`.
-
-**Слово, которого нет ни в одном описании:**
 ```sql
-SELECT *, MATCH(description) AGAINST('космос') AS релевантность
-FROM games;
-```
-Все значения релевантности будут 0.
-
-**Слово, которое есть только в одном описании:**
-```sql
-SELECT *, MATCH(description) AGAINST('симулятор') AS релевантность
-FROM games;
+SET AUTOCOMMIT = 0;
+BEGIN;
 ```
 
-**Слово, повторяющееся в нескольких описаниях (то что мы вставили):**
-```sql
-SELECT *, MATCH(description) AGAINST('война') AS релевантность
-FROM games;
-```
-Там где слово встречается 3 раза — релевантность выше.
+Теперь все изменения не сохраняются автоматически — только если ты сам напишешь COMMIT.
 
-**Два слова сразу:**
+---
+
+### Задание 5.2 — INSERT → вывести → ROLLBACK → вывести снова
+
 ```sql
-SELECT *, MATCH(description) AGAINST('война экшен') AS релевантность
-FROM games;
+-- Добавляем запись
+INSERT INTO authors (lastName, firstName) VALUES ('Гоголь', 'Николай');
+
+-- Смотрим — запись есть
+SELECT * FROM authors;
+
+-- Откатываем транзакцию
+ROLLBACK;
+
+-- Смотрим снова — записи нет, она исчезла
+SELECT * FROM authors;
+```
+
+После ROLLBACK Гоголя не будет — это и есть суть отката.
+
+---
+
+### Задание 5.3 — INSERT → SAVEPOINT → посмотреть
+
+```sql
+-- Снова начинаем транзакцию
+BEGIN;
+
+-- Добавляем запись
+INSERT INTO authors (lastName, firstName) VALUES ('Гоголь', 'Николай');
+
+-- Смотрим — запись есть
+SELECT * FROM authors;
+
+-- Создаём точку сохранения
+SAVEPOINT point1;
+
+-- Смотрим содержимое таблицы
+SELECT * FROM authors;
 ```
 
 ---
 
-### Задание 5.4 — Сортировка по релевантности
+### Задание 5.4 — UPDATE → откат к точке сохранения
 
-Те же 4 варианта, но теперь с `ORDER BY` — на примере двух слов из `name` и `description`:
-
-**Слово не встречается:**
 ```sql
-SELECT *, MATCH(name, description) AGAINST('космос') AS релевантность
-FROM games
-ORDER BY MATCH(name, description) AGAINST('космос') DESC;
-```
+-- Меняем запись
+UPDATE authors SET firstName = 'ИЗМЕНЕНО' WHERE lastName = 'Гоголь';
 
-**Слово в одном:**
-```sql
-SELECT *, MATCH(name, description) AGAINST('симулятор') AS релевантность
-FROM games
-ORDER BY MATCH(name, description) AGAINST('симулятор') DESC;
-```
+-- Смотрим — изменение есть
+SELECT * FROM authors;
 
-**Слово в нескольких:**
-```sql
-SELECT *, MATCH(name, description) AGAINST('война') AS релевантность
-FROM games
-ORDER BY MATCH(name, description) AGAINST('война') DESC;
-```
+-- Откатываемся к точке сохранения (UPDATE отменится, INSERT останется)
+ROLLBACK TO SAVEPOINT point1;
 
-**Два слова (только из description / только из name / из обоих):**
-```sql
--- Только из description:
-SELECT *, MATCH(name, description) AGAINST('война экшен') AS релевантность
-FROM games
-ORDER BY MATCH(name, description) AGAINST('война экшен') DESC;
-
--- Только из name:
-SELECT *, MATCH(name, description) AGAINST('Battlefield') AS релевантность
-FROM games
-ORDER BY MATCH(name, description) AGAINST('Battlefield') DESC;
-
--- Из обоих:
-SELECT *, MATCH(name, description) AGAINST('Battlefield война') AS релевантность
-FROM games
-ORDER BY MATCH(name, description) AGAINST('Battlefield война') DESC;
+-- Смотрим — изменение пропало, но Гоголь всё ещё есть
+SELECT * FROM authors;
 ```
 
 ---
 
-### Задание 5.5 — Поиск (фильтрация) по video_games
-
-Здесь используем `WHERE MATCH` — ищем по двум жанрам в таблице `video_games`.
+### Задание 5.5 — UPDATE → COMMIT → посмотреть
 
 ```sql
-SELECT *, MATCH(Genres) AGAINST('Action Sports') AS релевантность
-FROM video_games
-WHERE MATCH(Genres) AGAINST('Action Sports')
-ORDER BY релевантность DESC;
+-- Снова делаем изменение
+UPDATE authors SET firstName = 'Николай' WHERE lastName = 'Гоголь';
+
+-- Смотрим
+SELECT * FROM authors;
+
+-- Фиксируем транзакцию — теперь изменения сохранены навсегда
+COMMIT;
+
+-- Смотрим — всё зафиксировано
+SELECT * FROM authors;
 ```
 
 ---
 
-### Задание 5.6 — Boolean режим, исключение слова
+### Итого порядок выполнения в Workbench
 
-Ищем по жанрам в `video_games`, исключаем один жанр знаком `-`:
+Важный момент: **выполняй команды по одной** (выдели нужную строку и нажми Ctrl+Enter), а не весь блок сразу. Иначе ROLLBACK сработает раньше чем ты увидишь результат INSERT.
 
-```sql
-SELECT *, MATCH(Genres) AGAINST('Action -Sports' IN BOOLEAN MODE) AS релевантность
-FROM video_games
-WHERE MATCH(Genres) AGAINST('Action -Sports' IN BOOLEAN MODE)
-ORDER BY релевантность DESC;
-```
+Порядок такой:
 
----
+1. `SET AUTOCOMMIT = 0` → выполнить
+2. `BEGIN` → выполнить
+3. `INSERT ...` → выполнить
+4. `SELECT *` → выполнить, **сделать скриншот** (запись есть)
+5. `ROLLBACK` → выполнить
+6. `SELECT *` → выполнить, **скриншот** (записи нет)
+7. `BEGIN` → выполнить
+8. `INSERT ...` → выполнить
+9. `SELECT *` → скриншот
+10. `SAVEPOINT point1` → выполнить
+11. `UPDATE ...` → выполнить
+12. `SELECT *` → скриншот (изменение есть)
+13. `ROLLBACK TO SAVEPOINT point1` → выполнить
+14. `SELECT *` → скриншот (изменение пропало)
+15. `UPDATE ...` → выполнить
+16. `COMMIT` → выполнить
+17. `SELECT *` → скриншот (всё зафиксировано)
 
-### Задание 5.7 — Boolean режим, обязательное слово
-
-Знак `+` делает слово обязательным:
-
-```sql
-SELECT *, MATCH(Genres) AGAINST('Action +Sports' IN BOOLEAN MODE) AS релевантность
-FROM video_games
-WHERE MATCH(Genres) AGAINST('Action +Sports' IN BOOLEAN MODE)
-ORDER BY релевантность DESC;
-```
-
----
-
-### Задание 5.8 — Boolean режим, исключение + обязательное вместе
-
-```sql
-SELECT *, MATCH(Genres) AGAINST('Action +Sports -Strategy' IN BOOLEAN MODE) AS релевантность
-FROM video_games
-WHERE MATCH(Genres) AGAINST('Action +Sports -Strategy' IN BOOLEAN MODE)
-ORDER BY релевантность DESC;
-```
-
----
-
-**Итого порядок действий:**
-1. Создай БД и выполни оба SQL-файла
-2. Сделай UPDATE для 5 игр в `games`
-3. Добавь три fulltext-индекса
-4. Выполняй запросы по заданиям 5.3 → 5.8 по очереди
-
-Скажи как пойдёт — если будут ошибки, разберём!
+Скажи когда готова, разберём №9!
