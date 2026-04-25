@@ -1,93 +1,211 @@
-Теперь всё есть! Вот полные запросы под реальную таблицу `games`:
-
-## Шаг 1: Создать и заполнить таблицу
-Открой `Games_sql.txt` в Workbench через **File → Open SQL Script** → ⚡
+Окей, поехали! Начнём с Практической №7 — полнотекстовый поиск.
 
 ---
 
-## 5.2.1 — Добавить индексы:
+## Практическая №7 — план действий
+
+У тебя есть два SQL-файла. Их нужно выполнить в MySQL Workbench, чтобы создать таблицы. Потом будем писать запросы по заданиям.
+
+**Шаг 1 — Открой MySQL Workbench и подключись к своей БД** (обычно это localhost, пользователь root).
+
+**Шаг 2 — Создай или выбери базу данных.** В новом query-окне напиши и выполни:
+
 ```sql
--- Индекс на description:
+CREATE DATABASE IF NOT EXISTS games_db;
+USE games_db;
+```
+
+**Шаг 3 — Создай таблицу games.** Скопируй содержимое файла `Games_sql.txt` в query-окно и выполни. Таблица создастся и заполнится 10 играми.
+
+**Шаг 4 — Создай таблицу video_games.** Так же — скопируй `video_games_sql.txt` и выполни.
+
+---
+
+Теперь задания по порядку.
+
+---
+
+### Задание 5.1 — Изменить настройки (ft_min_word_len)
+
+Раз нет OpenServer, это задание просто **проверяем командой** — выполни в Workbench:
+
+```sql
+SHOW VARIABLES LIKE 'ft_min_word_len';
+```
+
+Покажет минимальную длину слова для поиска (обычно 4). Менять конфиг не нужно, просто запиши результат для отчёта.
+
+---
+
+### Задание 5.2 — Добавить полнотекстовые индексы
+
+**5.2.1 — Таблица games.**
+
+Сначала нужно изменить описания в 5 играх так, чтобы в них встречались одинаковые слова. Например, добавим слово **"война"** в разное количество раз:
+
+```sql
+USE games_db;
+
+UPDATE games SET description = 'Война и экшен — это SimCity про войну' WHERE idGame = 1;
+UPDATE games SET description = 'Война война война — три раза слово война в Titanfall' WHERE idGame = 2;
+UPDATE games SET description = 'Война война — два раза в Battlefield' WHERE idGame = 3;
+UPDATE games SET description = 'Здесь встречается слово война один раз в Sims' WHERE idGame = 4;
+UPDATE games SET description = 'Война снова появляется в Dark Souls один раз' WHERE idGame = 5;
+```
+
+Потом добавь индекс на столбец `description`:
+
+```sql
 ALTER TABLE games ADD FULLTEXT INDEX ft_description (description);
+```
 
--- Индекс на name и description:
-ALTER TABLE games ADD FULLTEXT INDEX ft_name_description (name, description);
+И индекс на два столбца сразу — `name` и `description`:
+
+```sql
+ALTER TABLE games ADD FULLTEXT INDEX ft_name_desc (name, description);
+```
+
+**5.2.2 — Таблица video_games.**
+
+Добавь индекс на столбец `Genres`:
+
+```sql
+ALTER TABLE video_games ADD FULLTEXT INDEX ft_genres (Genres);
 ```
 
 ---
 
-## 5.3 — Релевантность по description:
+### Задание 5.3 — Определение релевантности
+
+Здесь нужно 4 разных запроса к таблице `games` по столбцу `description`.
+
+**Слово, которого нет ни в одном описании:**
 ```sql
--- Слово которого нет нигде:
-SELECT name, MATCH(description) AGAINST ('блокчейн') AS релевантность FROM games;
+SELECT *, MATCH(description) AGAINST('космос') AS релевантность
+FROM games;
+```
+Все значения релевантности будут 0.
 
--- Слово только в одном описании:
-SELECT name, MATCH(description) AGAINST ('Пророк') AS релевантность FROM games;
+**Слово, которое есть только в одном описании:**
+```sql
+SELECT *, MATCH(description) AGAINST('симулятор') AS релевантность
+FROM games;
+```
 
--- Слово в нескольких описаниях:
-SELECT name, MATCH(description) AGAINST ('игра') AS релевантность FROM games;
+**Слово, повторяющееся в нескольких описаниях (то что мы вставили):**
+```sql
+SELECT *, MATCH(description) AGAINST('война') AS релевантность
+FROM games;
+```
+Там где слово встречается 3 раза — релевантность выше.
 
--- Два слова:
-SELECT name, MATCH(description) AGAINST ('игра мир') AS релевантность FROM games;
+**Два слова сразу:**
+```sql
+SELECT *, MATCH(description) AGAINST('война экшен') AS релевантность
+FROM games;
 ```
 
 ---
 
-## 5.4 — По name + description, сортировка по убыванию:
+### Задание 5.4 — Сортировка по релевантности
+
+Те же 4 варианта, но теперь с `ORDER BY` — на примере двух слов из `name` и `description`:
+
+**Слово не встречается:**
 ```sql
--- Слово которого нет:
-SELECT name, MATCH(name, description) AGAINST ('блокчейн') AS релевантность
-FROM games ORDER BY релевантность DESC;
+SELECT *, MATCH(name, description) AGAINST('космос') AS релевантность
+FROM games
+ORDER BY MATCH(name, description) AGAINST('космос') DESC;
+```
 
--- Только в одном:
-SELECT name, MATCH(name, description) AGAINST ('Пророк') AS релевантность
-FROM games ORDER BY релевантность DESC;
+**Слово в одном:**
+```sql
+SELECT *, MATCH(name, description) AGAINST('симулятор') AS релевантность
+FROM games
+ORDER BY MATCH(name, description) AGAINST('симулятор') DESC;
+```
 
--- В нескольких:
-SELECT name, MATCH(name, description) AGAINST ('игра') AS релевантность
-FROM games ORDER BY релевантность DESC;
+**Слово в нескольких:**
+```sql
+SELECT *, MATCH(name, description) AGAINST('война') AS релевантность
+FROM games
+ORDER BY MATCH(name, description) AGAINST('война') DESC;
+```
 
--- Два слова (из описания, из названия, из обоих):
-SELECT name, MATCH(name, description) AGAINST ('Battlefield Dark') AS релевантность
-FROM games ORDER BY релевантность DESC;
+**Два слова (только из description / только из name / из обоих):**
+```sql
+-- Только из description:
+SELECT *, MATCH(name, description) AGAINST('война экшен') AS релевантность
+FROM games
+ORDER BY MATCH(name, description) AGAINST('война экшен') DESC;
+
+-- Только из name:
+SELECT *, MATCH(name, description) AGAINST('Battlefield') AS релевантность
+FROM games
+ORDER BY MATCH(name, description) AGAINST('Battlefield') DESC;
+
+-- Из обоих:
+SELECT *, MATCH(name, description) AGAINST('Battlefield война') AS релевантность
+FROM games
+ORDER BY MATCH(name, description) AGAINST('Battlefield война') DESC;
 ```
 
 ---
 
-## 5.5 — По Genres в video_games:
+### Задание 5.5 — Поиск (фильтрация) по video_games
+
+Здесь используем `WHERE MATCH` — ищем по двум жанрам в таблице `video_games`.
+
 ```sql
-SELECT Title, Genres, MATCH(Genres) AGAINST ('Action Sports') AS релевантность
+SELECT *, MATCH(Genres) AGAINST('Action Sports') AS релевантность
 FROM video_games
-WHERE MATCH(Genres) AGAINST ('Action Sports')
+WHERE MATCH(Genres) AGAINST('Action Sports')
 ORDER BY релевантность DESC;
 ```
 
 ---
 
-## 5.6 — Boolean: исключить слово:
+### Задание 5.6 — Boolean режим, исключение слова
+
+Ищем по жанрам в `video_games`, исключаем один жанр знаком `-`:
+
 ```sql
-SELECT Title, Genres,
-MATCH(Genres) AGAINST ('Action -Sports' IN BOOLEAN MODE) AS релевантность
+SELECT *, MATCH(Genres) AGAINST('Action -Sports' IN BOOLEAN MODE) AS релевантность
 FROM video_games
-WHERE MATCH(Genres) AGAINST ('Action -Sports' IN BOOLEAN MODE);
+WHERE MATCH(Genres) AGAINST('Action -Sports' IN BOOLEAN MODE)
+ORDER BY релевантность DESC;
 ```
 
 ---
 
-## 5.7 — Boolean: обязательное слово:
+### Задание 5.7 — Boolean режим, обязательное слово
+
+Знак `+` делает слово обязательным:
+
 ```sql
-SELECT Title, Genres,
-MATCH(Genres) AGAINST ('Action +Racing' IN BOOLEAN MODE) AS релевантность
+SELECT *, MATCH(Genres) AGAINST('Action +Sports' IN BOOLEAN MODE) AS релевантность
 FROM video_games
-WHERE MATCH(Genres) AGAINST ('Action +Racing' IN BOOLEAN MODE);
+WHERE MATCH(Genres) AGAINST('Action +Sports' IN BOOLEAN MODE)
+ORDER BY релевантность DESC;
 ```
 
 ---
 
-## 5.8 — Boolean: обязательное + исключить:
+### Задание 5.8 — Boolean режим, исключение + обязательное вместе
+
 ```sql
-SELECT Title, Genres,
-MATCH(Genres) AGAINST ('Action +Racing -Sports' IN BOOLEAN MODE) AS релевантность
+SELECT *, MATCH(Genres) AGAINST('Action +Sports -Strategy' IN BOOLEAN MODE) AS релевантность
 FROM video_games
-WHERE MATCH(Genres) AGAINST ('Action +Racing -Sports' IN BOOLEAN MODE);
+WHERE MATCH(Genres) AGAINST('Action +Sports -Strategy' IN BOOLEAN MODE)
+ORDER BY релевантность DESC;
 ```
+
+---
+
+**Итого порядок действий:**
+1. Создай БД и выполни оба SQL-файла
+2. Сделай UPDATE для 5 игр в `games`
+3. Добавь три fulltext-индекса
+4. Выполняй запросы по заданиям 5.3 → 5.8 по очереди
+
+Скажи как пойдёт — если будут ошибки, разберём!
