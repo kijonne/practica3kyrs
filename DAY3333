@@ -1,0 +1,124 @@
+Смотрю что у тебя есть:Понял. У тебя `Games.csv` — это таблица о забаненных играх с колонками: `Id, Game, Series, Country, Details, Ban Category, Ban Status, Wikipedia Profile, Image, Summary, Developer, Publisher, Genre, Homepage`. Столбец `Summary` — это и есть описание (аналог Description из задания).
+
+Вот полные запросы под твои реальные данные:
+
+# Практическая №7 — под твои файлы
+
+## Шаг 1: Создать таблицы из CSV
+
+В Workbench: **Server → Data Import** → выбери CSV файл → укажи таблицу.
+
+Или через код:
+
+```sql
+-- Создать таблицу games вручную
+CREATE TABLE games (
+    Id VARCHAR(200),
+    Game VARCHAR(200),
+    Series VARCHAR(200),
+    Country VARCHAR(100),
+    Details TEXT,
+    `Ban Category` VARCHAR(200),
+    `Ban Status` VARCHAR(100),
+    `Wikipedia Profile` VARCHAR(300),
+    Image VARCHAR(300),
+    Summary TEXT,
+    Developer VARCHAR(300),
+    Publisher VARCHAR(300),
+    Genre VARCHAR(200),
+    Homepage VARCHAR(300)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+Потом импортируй CSV через **Table Data Import Wizard** (правая кнопка на таблице в левой панели).
+
+---
+
+## 5.2.1 — Добавить индексы на таблицу games:
+```sql
+-- Индекс на Summary (это Description в задании):
+ALTER TABLE games ADD FULLTEXT INDEX ft_summary (Summary);
+
+-- Индекс на Game и Summary (Title + Description):
+ALTER TABLE games ADD FULLTEXT INDEX ft_game_summary (Game, Summary);
+```
+
+## 5.2.2 — Индекс на video_games:
+```sql
+ALTER TABLE video_games ADD FULLTEXT INDEX ft_genres (Genres);
+```
+
+---
+
+## 5.3 — Релевантность по Summary:
+```sql
+-- Слово которого нет нигде:
+SELECT Game, MATCH(Summary) AGAINST ('блокчейн') AS релевантность FROM games;
+
+-- Слово только в одном (например название одной игры):
+SELECT Game, MATCH(Summary) AGAINST ('Kratos') AS релевантность FROM games;
+
+-- Слово в нескольких записях:
+SELECT Game, MATCH(Summary) AGAINST ('violence') AS релевантность FROM games;
+
+-- Два слова:
+SELECT Game, MATCH(Summary) AGAINST ('shooter violence') AS релевантность FROM games;
+```
+
+---
+
+## 5.4 — По Game + Summary, сортировка по релевантности:
+```sql
+-- Слово которого нет:
+SELECT Game, MATCH(Game, Summary) AGAINST ('блокчейн') AS релевантность
+FROM games ORDER BY релевантность DESC;
+
+-- Только в одном:
+SELECT Game, MATCH(Game, Summary) AGAINST ('Kratos') AS релевантность
+FROM games ORDER BY релевантность DESC;
+
+-- В нескольких:
+SELECT Game, MATCH(Game, Summary) AGAINST ('shooter') AS релевантность
+FROM games ORDER BY релевантность DESC;
+
+-- Два слова:
+SELECT Game, MATCH(Game, Summary) AGAINST ('Call Duty') AS релевантность
+FROM games ORDER BY релевантность DESC;
+```
+
+---
+
+## 5.5 — По Genres в video_games:
+```sql
+SELECT Title, Genres, MATCH(Genres) AGAINST ('Action Sports') AS релевантность
+FROM video_games
+WHERE MATCH(Genres) AGAINST ('Action Sports')
+ORDER BY релевантность DESC;
+```
+
+---
+
+## 5.6 — Boolean: исключить слово:
+```sql
+SELECT Title, Genres, MATCH(Genres) AGAINST ('Action -Sports' IN BOOLEAN MODE) AS релевантность
+FROM video_games
+WHERE MATCH(Genres) AGAINST ('Action -Sports' IN BOOLEAN MODE);
+```
+
+---
+
+## 5.7 — Boolean: обязательное слово:
+```sql
+SELECT Title, Genres, MATCH(Genres) AGAINST ('Action +Racing' IN BOOLEAN MODE) AS релевантность
+FROM video_games
+WHERE MATCH(Genres) AGAINST ('Action +Racing' IN BOOLEAN MODE);
+```
+
+---
+
+## 5.8 — Boolean: обязательное + исключить:
+```sql
+SELECT Title, Genres, MATCH(Genres) AGAINST ('Action +Racing -Sports' IN BOOLEAN MODE) AS релевантность
+FROM video_games
+WHERE MATCH(Genres) AGAINST ('Action +Racing -Sports' IN BOOLEAN MODE);
+```
