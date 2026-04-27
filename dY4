@@ -1,152 +1,201 @@
-## Практическая №13 — Функции пользователя
+## Объяснение кода из практической №13
 
-В MySQL Workbench для создания функций нужно сначала сменить разделитель. Каждую функцию выполняй **целым блоком** сразу.
-
----
-
-### Задание 5.1 — Стоимость заказа по номеру
+Разберу на примере первой функции, остальные по той же логике:
 
 ```sql
 DELIMITER //
+```
+Говорим MySQL: теперь команды заканчиваются на `//`, а не на `;` — это нужно потому что внутри функции есть свои `;` и MySQL не должен путаться где конец
+
+```sql
 CREATE FUNCTION get_order_total(p_order_id INT)
+```
+Создаём функцию с именем `get_order_total`, принимает один параметр — номер заказа (целое число). `p_` в начале — просто договорённость что это параметр
+
+```sql
 RETURNS DECIMAL(10,2)
-DETERMINISTIC
-READS SQL DATA
-BEGIN
-    DECLARE total DECIMAL(10,2);
-    
-    SELECT SUM(b.price * oi.quantity)
-    INTO total
-    FROM order_items oi
-    JOIN books b ON oi.book_id = b.book_id
-    WHERE oi.order_id = p_order_id;
-    
-    RETURN total;
-END //
-DELIMITER ;
-
--- Проверка (подставь реальный order_id из своей таблицы):
-SELECT get_order_total(1);
 ```
+Функция вернёт число с двумя знаками после запятой (цена)
+
+```sql
+DETERMINISTIC
+```
+Говорим MySQL: при одинаковых входных данных функция всегда даёт одинаковый результат
+
+```sql
+READS SQL DATA
+```
+Функция только читает данные, ничего не меняет
+
+```sql
+BEGIN ... END
+```
+Тело функции — весь код пишется между ними
+
+```sql
+DECLARE total DECIMAL(10,2);
+```
+Объявляем переменную `total` — она будет хранить результат внутри функции
+
+```sql
+SELECT SUM(b.price * oi.quantity)
+INTO total
+```
+Считаем сумму (цена × количество) и кладём результат в переменную `total`
+
+```sql
+RETURN total;
+```
+Возвращаем результат наружу
+
+```sql
+DELIMITER ;
+```
+Возвращаем обычный разделитель обратно
 
 ---
 
-### Задание 5.2 — Имя и фамилия заказчика заглавными по логину
-
-```sql
-DELIMITER //
-CREATE FUNCTION get_customer_name(p_login VARCHAR(50))
-RETURNS VARCHAR(100)
-DETERMINISTIC
-READS SQL DATA
-BEGIN
-    DECLARE result VARCHAR(100);
-    
-    SELECT UPPER(CONCAT(first_name, ' ', last_name))
-    INTO result
-    FROM customers
-    WHERE login = p_login;
-    
-    RETURN result;
-END //
-DELIMITER ;
-
--- Проверка (подставь реальный логин):
-SELECT get_customer_name('login1');
-```
+Остальные функции работают так же — разница только в том что считаем:
+- **5.2** — `UPPER(CONCAT(...))` склеивает имя и фамилию и делает заглавными
+- **5.3** — `GROUP_CONCAT` собирает все книги в одну строку через запятую
+- **5.4** — `COUNT(*)` просто считает количество строк
+- **5.5** — то же что 5.1 но фильтруем ещё и по году через `YEAR()`
 
 ---
 
-### Задание 5.3 — Список книг автора по его id
+## Практическая №14 — Хранимые процедуры
 
-```sql
-DELIMITER //
-CREATE FUNCTION get_author_books(p_author_id INT)
-RETURNS TEXT
-DETERMINISTIC
-READS SQL DATA
-BEGIN
-    DECLARE result TEXT;
-    
-    SELECT GROUP_CONCAT(title ORDER BY title SEPARATOR ', ')
-    INTO result
-    FROM books
-    WHERE author_id = p_author_id;
-    
-    RETURN result;
-END //
-DELIMITER ;
-
--- Проверка (подставь реальный author_id):
-SELECT get_author_books(1);
-```
+Отличие процедуры от функции — процедура не возвращает значение через `RETURN`, она выполняет действия. Вызывается через `CALL`.
 
 ---
 
-### Задание 5.4 — Количество авторов из указанной страны
+### Задание 5.1 — Добавить нового заказчика
 
 ```sql
 DELIMITER //
-CREATE FUNCTION get_authors_count_by_country(p_country VARCHAR(50))
-RETURNS INT
-DETERMINISTIC
-READS SQL DATA
+CREATE PROCEDURE add_customer(
+    p_login VARCHAR(50),
+    p_first_name VARCHAR(50),
+    p_last_name VARCHAR(50),
+    p_address VARCHAR(100),
+    p_phone VARCHAR(20)
+)
 BEGIN
-    DECLARE result INT;
+    -- Вставляем нового заказчика
+    INSERT INTO customers (login, first_name, last_name, address, phone)
+    VALUES (p_login, p_first_name, p_last_name, p_address, p_phone);
     
-    SELECT COUNT(*)
-    INTO result
-    FROM authors
-    WHERE country = p_country;
-    
-    RETURN result;
-END //
-DELIMITER ;
-
--- Проверка (подставь реальную страну):
-SELECT get_authors_count_by_country('Россия');
-```
-
----
-
-### Задание 5.5 — Прибыль за указанный год
-
-```sql
-DELIMITER //
-CREATE FUNCTION get_profit_by_year(p_year INT)
-RETURNS DECIMAL(10,2)
-DETERMINISTIC
-READS SQL DATA
-BEGIN
-    DECLARE result DECIMAL(10,2);
-    
-    SELECT SUM(b.price * oi.quantity)
-    INTO result
-    FROM order_items oi
-    JOIN books b ON oi.book_id = b.book_id
-    JOIN orders o ON oi.order_id = o.order_id
-    WHERE YEAR(o.order_datetime) = p_year;
-    
-    RETURN result;
+    -- Выводим id последней вставленной записи
+    SELECT LAST_INSERT_ID() AS new_customer_id;
 END //
 DELIMITER ;
 
 -- Проверка:
-SELECT get_profit_by_year(2024);
+CALL add_customer('ivanov', 'Иван', 'Иванов', 'Москва', '89001234567');
+SELECT * FROM customers;
+```
+
+---
+
+### Задание 5.2 — Поиск книг по тексту в названии
+
+```sql
+DELIMITER //
+CREATE PROCEDURE search_books_by_title(
+    p_text VARCHAR(100)
+)
+BEGIN
+    SELECT *
+    FROM books
+    WHERE title LIKE CONCAT('%', p_text, '%');
+END //
+DELIMITER ;
+
+-- Проверка:
+CALL search_books_by_title('война');
+```
+
+---
+
+### Задание 5.3 — Добавить автора, вернуть его id через параметр
+
+```sql
+DELIMITER //
+CREATE PROCEDURE add_author(
+    p_first_name VARCHAR(50),
+    p_last_name VARCHAR(50),
+    p_country VARCHAR(50),
+    OUT p_author_id INT
+)
+BEGIN
+    INSERT INTO authors (first_name, last_name, country)
+    VALUES (p_first_name, p_last_name, p_country);
+    
+    -- Кладём id в выходной параметр
+    SET p_author_id = LAST_INSERT_ID();
+END //
+DELIMITER ;
+
+-- Проверка:
+CALL add_author('Лев', 'Толстой', 'Россия', @new_id);
+SELECT @new_id AS new_author_id;
+```
+
+`OUT` означает что параметр выходной — процедура запишет в него значение и мы его потом читаем через `SELECT @new_id`
+
+---
+
+### Задание 5.4 — Изменить цену всех книг на процент
+
+```sql
+DELIMITER //
+CREATE PROCEDURE update_books_price(
+    p_percent DECIMAL(5,2)
+)
+BEGIN
+    -- Смотрим цены ДО изменения
+    SELECT title, price AS old_price FROM books;
+    
+    -- Меняем цену: умножаем на (1 + процент/100)
+    UPDATE books
+    SET price = price * (1 + p_percent / 100);
+    
+    -- Смотрим цены ПОСЛЕ изменения
+    SELECT title, price AS new_price FROM books;
+END //
+DELIMITER ;
+
+-- Проверка (5 = увеличить на 5%):
+CALL update_books_price(5);
+```
+
+---
+
+### Задание 5.5 — Удалить авторов без книг
+
+```sql
+DELIMITER //
+CREATE PROCEDURE delete_authors_without_books()
+BEGIN
+    -- Смотрим кого удалим
+    SELECT * FROM authors
+    WHERE author_id NOT IN (SELECT DISTINCT author_id FROM books);
+    
+    -- Удаляем
+    DELETE FROM authors
+    WHERE author_id NOT IN (SELECT DISTINCT author_id FROM books);
+    
+    -- Смотрим что осталось
+    SELECT * FROM authors;
+END //
+DELIMITER ;
+
+-- Проверка:
+CALL delete_authors_without_books();
 ```
 
 ---
 
 ### Порядок выполнения
 
-Каждый блок от `DELIMITER //` до `DELIMITER ;` выделяй **весь целиком** и жми Ctrl+Enter. Потом отдельно выполняй строку проверки `SELECT`.
-
-Чтобы узнать реальные значения для проверки — выполни:
-```sql
-SELECT order_id FROM orders LIMIT 3;
-SELECT login FROM customers LIMIT 3;
-SELECT author_id FROM authors LIMIT 3;
-SELECT DISTINCT country FROM authors;
-```
-
-Пиши если ошибки!
+Так же как в №13 — каждый блок выделяй целиком и выполняй, потом отдельно строку `CALL` для проверки. Перед тем как запускать 5.4 — сделай скриншот цен до изменения! И будь осторожна с 5.5 — она реально удалит данные, сначала проверь `SELECT` отдельно.
