@@ -1,0 +1,176 @@
+## Практическая №13 — Функции пользователя
+
+Важный момент — перед каждой функцией нужно менять **разделитель** командой `DELIMITER`, иначе Workbench запутается где заканчивается функция. Объясняю в каждом задании.
+
+```sql
+USE market;
+```
+
+---
+
+### Задание 5.1 — Функция: стоимость заказа по номеру
+
+Принимает номер заказа, возвращает общую сумму.
+
+```sql
+DELIMITER //
+
+CREATE FUNCTION get_order_cost(p_idOrder INT)
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE total DECIMAL(10,2);
+    
+    SELECT SUM(b.price * od.quantity)
+    INTO total
+    FROM order_details od
+    JOIN books b ON od.idBook = b.idBook
+    WHERE od.idOrder = p_idOrder;
+    
+    RETURN total;
+END //
+
+DELIMITER ;
+```
+
+Проверь — подставь реальный номер заказа из своей БД:
+```sql
+SELECT get_order_cost(1);
+```
+
+---
+
+### Задание 5.2 — Функция: имя и фамилия заказчика заглавными буквами по логину
+
+```sql
+DELIMITER //
+
+CREATE FUNCTION get_customer_name(p_login VARCHAR(50))
+RETURNS VARCHAR(100)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE result VARCHAR(100);
+    
+    SELECT CONCAT(UPPER(firstName), ' ', UPPER(lastName))
+    INTO result
+    FROM customers
+    WHERE login = p_login;
+    
+    RETURN result;
+END //
+
+DELIMITER ;
+```
+
+Проверь — подставь реальный логин:
+```sql
+SELECT get_customer_name('логин_заказчика');
+```
+
+---
+
+### Задание 5.3 — Функция: список книг автора по его id одной строкой
+
+```sql
+DELIMITER //
+
+CREATE FUNCTION get_author_books(p_idAuthor INT)
+RETURNS TEXT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE result TEXT;
+    
+    SELECT GROUP_CONCAT(title ORDER BY title SEPARATOR ', ')
+    INTO result
+    FROM books
+    WHERE idAuthor = p_idAuthor;
+    
+    RETURN result;
+END //
+
+DELIMITER ;
+```
+
+Проверь:
+```sql
+SELECT get_author_books(1);
+```
+
+---
+
+### Задание 5.4 — Функция: количество авторов из указанной страны
+
+```sql
+DELIMITER //
+
+CREATE FUNCTION get_authors_count_by_country(p_country VARCHAR(50))
+RETURNS INT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE total INT;
+    
+    SELECT COUNT(*)
+    INTO total
+    FROM authors
+    WHERE country = p_country;
+    
+    RETURN total;
+END //
+
+DELIMITER ;
+```
+
+Проверь — подставь реальную страну из своей БД:
+```sql
+SELECT get_authors_count_by_country('Россия');
+```
+
+---
+
+### Задание 5.5 — Функция: прибыль за указанный год
+
+```sql
+DELIMITER //
+
+CREATE FUNCTION get_profit_by_year(p_year INT)
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE total DECIMAL(10,2);
+    
+    SELECT SUM(b.price * od.quantity)
+    INTO total
+    FROM order_details od
+    JOIN books b ON od.idBook = b.idBook
+    JOIN orders o ON od.idOrder = o.idOrder
+    WHERE YEAR(o.orderDate) = p_year;
+    
+    RETURN total;
+END //
+
+DELIMITER ;
+```
+
+Проверь:
+```sql
+SELECT get_profit_by_year(2023);
+```
+
+---
+
+### Итого порядок
+
+Выполняй каждый блок целиком — от `DELIMITER //` до `DELIMITER ;` — выделяй всё сразу и жми Ctrl+Enter. Потом сразу проверяй через `SELECT`.
+
+Если вылезет ошибка типа **"Table doesn't exist"** — значит у тебя таблицы называются по-другому. Выполни это чтобы посмотреть все таблицы:
+
+```sql
+SHOW TABLES;
+```
+
+И скажи мне как они называются — подправим!
