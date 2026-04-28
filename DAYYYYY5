@@ -1,0 +1,191 @@
+Вижу практические №15, 16, 17. Начинаем с №15 — триггеры AFTER!
+
+---
+
+## Практическая №15 — AFTER триггеры
+
+### Задание 5.1 — Таблица УдалённыеЗаказчики + триггер DELETE на customers
+
+```sql
+-- Создаём таблицу для удалённых заказчиков
+CREATE TABLE IF NOT EXISTS deleted_customers (
+    customer_id INT,
+    login VARCHAR(20),
+    last_name VARCHAR(50),
+    first_name VARCHAR(50),
+    address VARCHAR(100),
+    phone VARCHAR(20),
+    deleted_at DATETIME
+);
+
+-- Создаём триггер
+DELIMITER //
+CREATE TRIGGER after_customer_delete
+AFTER DELETE ON customers
+FOR EACH ROW
+BEGIN
+    INSERT INTO deleted_customers (
+        customer_id, login, last_name, 
+        first_name, address, phone, deleted_at
+    )
+    VALUES (
+        OLD.customer_id, OLD.login, OLD.last_name,
+        OLD.first_name, OLD.address, OLD.phone, NOW()
+    );
+END //
+DELIMITER ;
+
+-- Проверка — удали тестового заказчика и посмотри:
+DELETE FROM customers WHERE login = 'arinaUSA';
+SELECT * FROM deleted_customers;
+```
+
+`OLD` — это удалённая строка, MySQL автоматически её запоминает внутри триггера.
+
+---
+
+### Задание 5.2 — Таблица Logs + триггеры для books и orders
+
+```sql
+-- Создаём таблицу логов
+CREATE TABLE IF NOT EXISTS logs (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(50),
+    operation VARCHAR(10),
+    log_datetime DATETIME,
+    current_user VARCHAR(50)
+);
+```
+
+**Триггеры для таблицы books:**
+
+```sql
+DELIMITER //
+
+CREATE TRIGGER after_books_insert
+AFTER INSERT ON books
+FOR EACH ROW
+BEGIN
+    INSERT INTO logs (table_name, operation, log_datetime, current_user)
+    VALUES ('books', 'INSERT', NOW(), USER());
+END //
+
+CREATE TRIGGER after_books_update
+AFTER UPDATE ON books
+FOR EACH ROW
+BEGIN
+    INSERT INTO logs (table_name, operation, log_datetime, current_user)
+    VALUES ('books', 'UPDATE', NOW(), USER());
+END //
+
+CREATE TRIGGER after_books_delete
+AFTER DELETE ON books
+FOR EACH ROW
+BEGIN
+    INSERT INTO logs (table_name, operation, log_datetime, current_user)
+    VALUES ('books', 'DELETE', NOW(), USER());
+END //
+
+DELIMITER ;
+```
+
+**Триггеры для таблицы orders:**
+
+```sql
+DELIMITER //
+
+CREATE TRIGGER after_orders_insert
+AFTER INSERT ON orders
+FOR EACH ROW
+BEGIN
+    INSERT INTO logs (table_name, operation, log_datetime, current_user)
+    VALUES ('orders', 'INSERT', NOW(), USER());
+END //
+
+CREATE TRIGGER after_orders_update
+AFTER UPDATE ON orders
+FOR EACH ROW
+BEGIN
+    INSERT INTO logs (table_name, operation, log_datetime, current_user)
+    VALUES ('orders', 'UPDATE', NOW(), USER());
+END //
+
+CREATE TRIGGER after_orders_delete
+AFTER DELETE ON orders
+FOR EACH ROW
+BEGIN
+    INSERT INTO logs (table_name, operation, log_datetime, current_user)
+    VALUES ('orders', 'DELETE', NOW(), USER());
+END //
+
+DELIMITER ;
+
+-- Проверка — делаем любое изменение и смотрим логи:
+UPDATE books SET price = price WHERE book_id = 1;
+SELECT * FROM logs;
+```
+
+---
+
+### Задание 5.3 — Изменить триггер DELETE для orders
+
+При удалении заказа — удалять заказчиков без заказов.
+
+```sql
+DROP TRIGGER IF EXISTS after_orders_delete;
+
+DELIMITER //
+CREATE TRIGGER after_orders_delete
+AFTER DELETE ON orders
+FOR EACH ROW
+BEGIN
+    -- Пишем в лог
+    INSERT INTO logs (table_name, operation, log_datetime, current_user)
+    VALUES ('orders', 'DELETE', NOW(), USER());
+    
+    -- Удаляем заказчиков у которых больше нет заказов
+    DELETE FROM customers
+    WHERE customer_id NOT IN (
+        SELECT DISTINCT customer_id FROM orders
+    );
+END //
+DELIMITER ;
+
+-- Проверка:
+SELECT * FROM customers;
+DELETE FROM orders WHERE order_id = 1;
+SELECT * FROM customers;
+```
+
+---
+
+### Задание 5.4 — Изменить триггер INSERT для order_items
+
+При добавлении в состав заказа — записывать стоимость заказа в переменную `@orderCost`.
+
+```sql
+DROP TRIGGER IF EXISTS after_order_items_insert;
+
+DELIMITER //
+CREATE TRIGGER after_order_items_insert
+AFTER INSERT ON order_items
+FOR EACH ROW
+BEGIN
+    SELECT SUM(b.price * oi.quantity)
+    INTO @orderCost
+    FROM order_items oi
+    JOIN books b ON oi.book_id = b.book_id
+    WHERE oi.order_id = NEW.order_id;
+END //
+DELIMITER ;
+
+-- Проверка — добавь строку в order_items и посмотри переменную:
+INSERT INTO order_items (order_id, book_id, quantity) VALUES (1, 1, 2);
+SELECT @orderCost;
+```
+
+`NEW` — это новая вставленная строка, противоположность `OLD`.
+
+---
+
+Выполняй по порядку, делай скриншоты после каждой проверки. Пиши если ошибки — разберём!
