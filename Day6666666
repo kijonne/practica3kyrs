@@ -1,0 +1,227 @@
+## Практическая №20 — Работа с данными из C# и Python
+
+---
+
+## Задание 5.1 — Метод для выборки таблицы (DataTable)
+
+### 5.1.1 — Добавь метод в класс DAL.cs
+
+```csharp
+using MySql.Data.MySqlClient;
+using System.Data;
+
+public static class DAL
+{
+    public static string Server = "localhost";
+    public static string Port = "3306";
+    public static string Database = "market";
+    public static string UserID = "root";
+    public static string Password = "";
+
+    public static string GetConnectionString()
+    {
+        var stringBuilder = new MySqlConnectionStringBuilder();
+        stringBuilder.Server = Server;
+        stringBuilder.Port = uint.Parse(Port);
+        stringBuilder.UserID = UserID;
+        stringBuilder.Password = Password;
+        stringBuilder.Database = Database;
+        return stringBuilder.ConnectionString;
+    }
+
+    // 5.1.1 — метод возвращающий DataTable
+    public static DataTable GetTable(string query)
+    {
+        DataTable table = new DataTable();
+        using (MySqlConnection connection = new MySqlConnection(GetConnectionString()))
+        {
+            connection.Open();
+            MySqlCommand command = new MySqlCommand(query, connection);
+            table.Load(command.ExecuteReader());
+        }
+        return table;
+    }
+
+    // 5.2.1 — метод возвращающий одно значение
+    public static object GetScalar(string query)
+    {
+        using (MySqlConnection connection = new MySqlConnection(GetConnectionString()))
+        {
+            connection.Open();
+            MySqlCommand command = new MySqlCommand(query, connection);
+            return command.ExecuteScalar();
+        }
+    }
+}
+```
+
+---
+
+### 5.1.2-5.1.3 — Форма с DataGridView
+
+Открой `MainWindow.xaml` и замени содержимое:
+
+```xml
+<Window x:Class="MarketApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Market App" Height="500" Width="700">
+    <StackPanel Margin="10">
+        
+        <!-- 5.1 — показать таблицу -->
+        <TextBlock Text="Название таблицы:" Margin="0,5"/>
+        <TextBox x:Name="txtTableName" Margin="0,5"/>
+        <Button Content="Показать таблицу" 
+                Click="btnShowTable_Click" 
+                Margin="0,5"/>
+        <DataGrid x:Name="dataGrid" 
+                  Height="180" 
+                  Margin="0,5"
+                  AutoGenerateColumns="True"
+                  IsReadOnly="True"/>
+
+        <!-- 5.2 — выборка одного значения -->
+        <TextBlock Text="SQL запрос (одно значение):" Margin="0,10,0,5"/>
+        <TextBox x:Name="txtScalarQuery" Margin="0,5"/>
+        <Button Content="Выполнить" 
+                Click="btnScalar_Click" 
+                Margin="0,5"/>
+        <TextBlock x:Name="lblScalarResult" 
+                   Margin="0,5"
+                   FontSize="14"/>
+
+    </StackPanel>
+</Window>
+```
+
+Открой `MainWindow.xaml.cs`:
+
+```csharp
+using System.Windows;
+
+public partial class MainWindow : Window
+{
+    public MainWindow()
+    {
+        InitializeComponent();
+    }
+
+    // 5.1 — показать таблицу
+    private void btnShowTable_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string query = $"SELECT * FROM {txtTableName.Text}";
+            var table = DAL.GetTable(query);
+            dataGrid.ItemsSource = table.DefaultView;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка: {ex.Message}");
+        }
+    }
+
+    // 5.2 — одно значение
+    private void btnScalar_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var result = DAL.GetScalar(txtScalarQuery.Text);
+            lblScalarResult.Text = $"Результат: {result}";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка: {ex.Message}");
+        }
+    }
+}
+```
+
+**Проверка:**
+- В поле таблицы напиши `books` → нажми "Показать таблицу" → появится таблица
+- В поле запроса напиши `SELECT COUNT(*) FROM books` → нажми "Выполнить" → покажет число
+
+---
+
+## Задание 5.3 — Python чтение таблицы
+
+Создай файл `read_table.py`:
+
+```python
+import mysql.connector
+
+try:
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",        # твой пароль
+        db="market"
+    )
+    print("Подключение успешно!")
+
+    cursor = conn.cursor()
+
+    # Пользователь вводит название таблицы
+    table_name = input("Введите название таблицы: ")
+
+    cursor.execute(f"SELECT * FROM {table_name}")
+    results = cursor.fetchall()
+
+    # Построчный вывод только названия и цены книги
+    print("\nНазвание — Цена:")
+    for row in results:
+        print(f"{row[2]} — {row[4]}")  # title=индекс 2, price=индекс 4
+
+    conn.close()
+
+except mysql.connector.Error as e:
+    print(f"Ошибка подключения: {e}")
+```
+
+---
+
+## Задание 5.4 — Python поиск книг дешевле указанной цены
+
+Создай файл `search_books.py`:
+
+```python
+import mysql.connector
+
+try:
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",        # твой пароль
+        db="market"
+    )
+
+    cursor = conn.cursor()
+
+    # Пользователь вводит максимальную цену
+    max_price = input("Введите максимальную цену: ")
+
+    # Подстановка через %s — защита от SQL инъекций
+    cursor.execute("SELECT * FROM books WHERE price < %s", (max_price,))
+    results = cursor.fetchall()
+
+    print(f"\nКниги дешевле {max_price}:")
+    for row in results:
+        print(f"{row[2]} — {row[4]}")  # title, price
+
+    conn.close()
+
+except mysql.connector.Error as e:
+    print(f"Ошибка: {e}")
+```
+
+---
+
+### Итого порядок
+
+1. В DAL.cs добавь оба метода `GetTable` и `GetScalar`
+2. Замени MainWindow.xaml и MainWindow.xaml.cs
+3. Запусти — проверь оба поля
+4. Запусти `read_table.py` в командной строке
+5. Запусти `search_books.py` в командной строке
+
+Скажи если ошибки в Visual Studio!
