@@ -1,0 +1,86 @@
+Вот исправленный метод `ExecuteQuery` в `DAL.cs` через `command.Parameters`:
+
+```csharp
+public static int ExecuteQuery(string query, MySqlParameter[] parameters = null)
+{
+    using (MySqlConnection connection = new MySqlConnection(GetConnectionString()))
+    {
+        connection.Open();
+        MySqlCommand command = new MySqlCommand(query, connection);
+        
+        // Добавляем параметры если они есть
+        if (parameters != null)
+        {
+            command.Parameters.AddRange(parameters);
+        }
+        
+        return command.ExecuteNonQuery();
+    }
+}
+```
+
+---
+
+Теперь при вызове в кнопке удаления например так:
+
+```csharp
+private void btnDelete_Click(object sender, RoutedEventArgs e)
+{
+    try
+    {
+        string query = "DELETE FROM books WHERE book_id = @id";
+        
+        MySqlParameter[] parameters = {
+            new MySqlParameter("@id", txtDeleteId.Text)
+        };
+        
+        int rows = DAL.ExecuteQuery(query, parameters);
+        
+        if (rows > 0)
+            lblDeleteResult.Text = $"Книга удалена!";
+        else
+            lblDeleteResult.Text = "Книга не найдена.";
+    }
+    catch (Exception ex)
+    {
+        lblDeleteResult.Text = $"Ошибка: {ex.Message}";
+    }
+}
+```
+
+И кнопка добавления:
+
+```csharp
+private void btnInsert_Click(object sender, RoutedEventArgs e)
+{
+    try
+    {
+        string query = "INSERT INTO books (author_id, title, genre, price, weight, pages, publish_year) " +
+                       "VALUES (@authorId, @title, @genre, @price, @weight, @pages, @year)";
+
+        MySqlParameter[] parameters = {
+            new MySqlParameter("@authorId", txtAuthorId.Text),
+            new MySqlParameter("@title", txtTitle.Text),
+            new MySqlParameter("@genre", txtGenre.Text),
+            new MySqlParameter("@price", txtPrice.Text),
+            new MySqlParameter("@weight", txtWeight.Text),
+            new MySqlParameter("@pages", txtPages.Text),
+            new MySqlParameter("@year", txtYear.Text)
+        };
+
+        int rows = DAL.ExecuteQuery(query, parameters);
+        lblInsertResult.Text = $"Книга '{txtTitle.Text}' добавлена!";
+    }
+    catch (Exception ex)
+    {
+        lblInsertResult.Text = $"Ошибка: {ex.Message}";
+    }
+}
+```
+
+---
+
+**Чем отличается от `%s` в Python:**
+- В Python используется `%s` как заполнитель
+- В C# используется `@название` как заполнитель
+- Смысл тот же — защита от SQL инъекций, значения подставляются безопасно
