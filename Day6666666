@@ -1,100 +1,107 @@
-## Практическая №20 — Работа с данными из C# и Python
+## Практическая №21 — Модификация данных из C# и Python
 
 ---
 
-## Задание 5.1 — Метод для выборки таблицы (DataTable)
+## Задание 5.1 — Метод ExecuteNonQuery в DAL
 
-### 5.1.1 — Добавь метод в класс DAL.cs
+Добавь в `DAL.cs` новый метод:
 
 ```csharp
-using MySql.Data.MySqlClient;
-using System.Data;
-
-public static class DAL
+// 5.1.1 — метод выполняющий DML команды (INSERT, UPDATE, DELETE)
+public static int ExecuteQuery(string query)
 {
-    public static string Server = "localhost";
-    public static string Port = "3306";
-    public static string Database = "market";
-    public static string UserID = "root";
-    public static string Password = "";
-
-    public static string GetConnectionString()
+    using (MySqlConnection connection = new MySqlConnection(GetConnectionString()))
     {
-        var stringBuilder = new MySqlConnectionStringBuilder();
-        stringBuilder.Server = Server;
-        stringBuilder.Port = uint.Parse(Port);
-        stringBuilder.UserID = UserID;
-        stringBuilder.Password = Password;
-        stringBuilder.Database = Database;
-        return stringBuilder.ConnectionString;
-    }
-
-    // 5.1.1 — метод возвращающий DataTable
-    public static DataTable GetTable(string query)
-    {
-        DataTable table = new DataTable();
-        using (MySqlConnection connection = new MySqlConnection(GetConnectionString()))
-        {
-            connection.Open();
-            MySqlCommand command = new MySqlCommand(query, connection);
-            table.Load(command.ExecuteReader());
-        }
-        return table;
-    }
-
-    // 5.2.1 — метод возвращающий одно значение
-    public static object GetScalar(string query)
-    {
-        using (MySqlConnection connection = new MySqlConnection(GetConnectionString()))
-        {
-            connection.Open();
-            MySqlCommand command = new MySqlCommand(query, connection);
-            return command.ExecuteScalar();
-        }
+        connection.Open();
+        MySqlCommand command = new MySqlCommand(query, connection);
+        return command.ExecuteNonQuery(); // возвращает кол-во изменённых строк
     }
 }
 ```
 
 ---
 
-### 5.1.2-5.1.3 — Форма с DataGridView
+## Задание 5.1.2 + 5.2 + 5.3 — Форма с тремя вкладками
 
-Открой `MainWindow.xaml` и замени содержимое:
+Замени `MainWindow.xaml`:
 
 ```xml
 <Window x:Class="MarketApp.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Market App" Height="500" Width="700">
-    <StackPanel Margin="10">
-        
-        <!-- 5.1 — показать таблицу -->
-        <TextBlock Text="Название таблицы:" Margin="0,5"/>
-        <TextBox x:Name="txtTableName" Margin="0,5"/>
-        <Button Content="Показать таблицу" 
-                Click="btnShowTable_Click" 
-                Margin="0,5"/>
-        <DataGrid x:Name="dataGrid" 
-                  Height="180" 
-                  Margin="0,5"
-                  AutoGenerateColumns="True"
-                  IsReadOnly="True"/>
+        Title="Market App" Height="550" Width="700">
+    <TabControl Margin="10">
 
-        <!-- 5.2 — выборка одного значения -->
-        <TextBlock Text="SQL запрос (одно значение):" Margin="0,10,0,5"/>
-        <TextBox x:Name="txtScalarQuery" Margin="0,5"/>
-        <Button Content="Выполнить" 
-                Click="btnScalar_Click" 
-                Margin="0,5"/>
-        <TextBlock x:Name="lblScalarResult" 
-                   Margin="0,5"
-                   FontSize="14"/>
+        <!-- 5.1.2 — выполнить любую SQL команду -->
+        <TabItem Header="SQL команда">
+            <StackPanel Margin="10">
+                <TextBlock Text="Введите SQL команду:" Margin="0,5"/>
+                <TextBox x:Name="txtQuery" 
+                         Height="80" 
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         Margin="0,5"/>
+                <Button Content="Выполнить" 
+                        Click="btnExecute_Click" 
+                        Margin="0,5"/>
+                <TextBlock x:Name="lblQueryResult" 
+                           Margin="0,5"
+                           FontSize="14"/>
+            </StackPanel>
+        </TabItem>
 
-    </StackPanel>
+        <!-- 5.2 — удалить книгу по коду -->
+        <TabItem Header="Удалить книгу">
+            <StackPanel Margin="10">
+                <TextBlock Text="Код книги для удаления:" Margin="0,5"/>
+                <TextBox x:Name="txtDeleteId" Margin="0,5"/>
+                <Button Content="Удалить" 
+                        Click="btnDelete_Click" 
+                        Margin="0,5"/>
+                <TextBlock x:Name="lblDeleteResult" 
+                           Margin="0,5"
+                           FontSize="14"/>
+            </StackPanel>
+        </TabItem>
+
+        <!-- 5.3 — добавить новую книгу -->
+        <TabItem Header="Добавить книгу">
+            <StackPanel Margin="10">
+                <TextBlock Text="ID автора:" Margin="0,5"/>
+                <TextBox x:Name="txtAuthorId" Margin="0,5"/>
+                
+                <TextBlock Text="Название:" Margin="0,5"/>
+                <TextBox x:Name="txtTitle" Margin="0,5"/>
+                
+                <TextBlock Text="Жанр:" Margin="0,5"/>
+                <TextBox x:Name="txtGenre" Margin="0,5"/>
+                
+                <TextBlock Text="Цена:" Margin="0,5"/>
+                <TextBox x:Name="txtPrice" Margin="0,5"/>
+                
+                <TextBlock Text="Вес:" Margin="0,5"/>
+                <TextBox x:Name="txtWeight" Margin="0,5"/>
+                
+                <TextBlock Text="Страниц:" Margin="0,5"/>
+                <TextBox x:Name="txtPages" Margin="0,5"/>
+                
+                <TextBlock Text="Год издания:" Margin="0,5"/>
+                <TextBox x:Name="txtYear" Margin="0,5"/>
+                
+                <Button Content="Добавить книгу" 
+                        Click="btnInsert_Click" 
+                        Margin="0,10"/>
+                <TextBlock x:Name="lblInsertResult" 
+                           Margin="0,5"
+                           FontSize="14"/>
+            </StackPanel>
+        </TabItem>
+
+    </TabControl>
 </Window>
 ```
 
-Открой `MainWindow.xaml.cs`:
+Замени `MainWindow.xaml.cs`:
 
 ```csharp
 using System.Windows;
@@ -106,46 +113,69 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    // 5.1 — показать таблицу
-    private void btnShowTable_Click(object sender, RoutedEventArgs e)
+    // 5.1.2 — выполнить любую SQL команду
+    private void btnExecute_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            string query = $"SELECT * FROM {txtTableName.Text}";
-            var table = DAL.GetTable(query);
-            dataGrid.ItemsSource = table.DefaultView;
+            int rows = DAL.ExecuteQuery(txtQuery.Text);
+            lblQueryResult.Text = $"Выполнено! Изменено строк: {rows}";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Ошибка: {ex.Message}");
+            lblQueryResult.Text = $"Ошибка: {ex.Message}";
         }
     }
 
-    // 5.2 — одно значение
-    private void btnScalar_Click(object sender, RoutedEventArgs e)
+    // 5.2 — удалить книгу по коду
+    private void btnDelete_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var result = DAL.GetScalar(txtScalarQuery.Text);
-            lblScalarResult.Text = $"Результат: {result}";
+            string query = $"DELETE FROM books WHERE book_id = {txtDeleteId.Text}";
+            int rows = DAL.ExecuteQuery(query);
+            if (rows > 0)
+                lblDeleteResult.Text = $"Книга с кодом {txtDeleteId.Text} удалена!";
+            else
+                lblDeleteResult.Text = "Книга с таким кодом не найдена.";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Ошибка: {ex.Message}");
+            lblDeleteResult.Text = $"Ошибка: {ex.Message}";
+        }
+    }
+
+    // 5.3 — добавить новую книгу
+    private void btnInsert_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string query = $"INSERT INTO books " +
+                           $"(author_id, title, genre, price, weight, pages, publish_year) " +
+                           $"VALUES ({txtAuthorId.Text}, " +
+                           $"'{txtTitle.Text}', " +
+                           $"'{txtGenre.Text}', " +
+                           $"{txtPrice.Text}, " +
+                           $"{txtWeight.Text}, " +
+                           $"{txtPages.Text}, " +
+                           $"{txtYear.Text})";
+
+            int rows = DAL.ExecuteQuery(query);
+            lblInsertResult.Text = $"Книга '{txtTitle.Text}' добавлена!";
+        }
+        catch (Exception ex)
+        {
+            lblInsertResult.Text = $"Ошибка: {ex.Message}";
         }
     }
 }
 ```
 
-**Проверка:**
-- В поле таблицы напиши `books` → нажми "Показать таблицу" → появится таблица
-- В поле запроса напиши `SELECT COUNT(*) FROM books` → нажми "Выполнить" → покажет число
-
 ---
 
-## Задание 5.3 — Python чтение таблицы
+## Задание 5.4 — Python изменение цены книги
 
-Создай файл `read_table.py`:
+Создай файл `update_price.py`:
 
 ```python
 import mysql.connector
@@ -154,59 +184,32 @@ try:
     conn = mysql.connector.connect(
         host="localhost",
         user="root",
-        passwd="",        # твой пароль
-        db="market"
-    )
-    print("Подключение успешно!")
-
-    cursor = conn.cursor()
-
-    # Пользователь вводит название таблицы
-    table_name = input("Введите название таблицы: ")
-
-    cursor.execute(f"SELECT * FROM {table_name}")
-    results = cursor.fetchall()
-
-    # Построчный вывод только названия и цены книги
-    print("\nНазвание — Цена:")
-    for row in results:
-        print(f"{row[2]} — {row[4]}")  # title=индекс 2, price=индекс 4
-
-    conn.close()
-
-except mysql.connector.Error as e:
-    print(f"Ошибка подключения: {e}")
-```
-
----
-
-## Задание 5.4 — Python поиск книг дешевле указанной цены
-
-Создай файл `search_books.py`:
-
-```python
-import mysql.connector
-
-try:
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        passwd="",        # твой пароль
+        passwd="",      # твой пароль
         db="market"
     )
 
     cursor = conn.cursor()
 
-    # Пользователь вводит максимальную цену
-    max_price = input("Введите максимальную цену: ")
+    # Пользователь вводит код и новую цену
+    book_id = input("Введите код книги: ")
+    new_price = input("Введите новую цену: ")
 
-    # Подстановка через %s — защита от SQL инъекций
-    cursor.execute("SELECT * FROM books WHERE price < %s", (max_price,))
+    # Выполняем DML запрос
+    cursor.execute(
+        "UPDATE books SET price = %s WHERE book_id = %s",
+        (new_price, book_id)
+    )
+
+    # Сохраняем транзакцию
+    conn.commit()
+    print(f"Цена книги {book_id} изменена на {new_price}!")
+
+    # Проверяем результат
+    cursor.execute("SELECT book_id, title, price FROM books WHERE book_id = %s", (book_id,))
     results = cursor.fetchall()
-
-    print(f"\nКниги дешевле {max_price}:")
+    print("\nРезультат:")
     for row in results:
-        print(f"{row[2]} — {row[4]}")  # title, price
+        print(f"ID: {row[0]} | Название: {row[1]} | Цена: {row[2]}")
 
     conn.close()
 
@@ -218,10 +221,9 @@ except mysql.connector.Error as e:
 
 ### Итого порядок
 
-1. В DAL.cs добавь оба метода `GetTable` и `GetScalar`
-2. Замени MainWindow.xaml и MainWindow.xaml.cs
-3. Запусти — проверь оба поля
-4. Запусти `read_table.py` в командной строке
-5. Запусти `search_books.py` в командной строке
+1. Добавь `ExecuteQuery` в `DAL.cs`
+2. Замени `MainWindow.xaml` и `MainWindow.xaml.cs`
+3. Запусти — проверь все три вкладки со скриншотами
+4. Запусти `update_price.py` в командной строке — введи код книги и цену
 
-Скажи если ошибки в Visual Studio!
+Пиши если ошибки в Visual Studio!
