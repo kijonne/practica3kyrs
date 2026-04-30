@@ -1,0 +1,289 @@
+## Практическая №27 — PDO + модули сайта
+
+Создай новую папку `pract27` в `localhost\`. Туда кладём все файлы.
+
+---
+
+### Шаг 1 — connection.php
+
+```php
+<?php
+$host = 'localhost';
+$database = 'market';
+$user = 'root';
+$password = 'root'; // твой пароль
+
+try {
+    // PDO подключение — отличается от mysqli!
+    $pdo = new PDO(
+        "mysql:host=$host;dbname=$database;charset=utf8",
+        $user,
+        $password
+    );
+    // Включаем показ ошибок
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Ошибка подключения: " . $e->getMessage());
+}
+?>
+```
+
+---
+
+### Шаг 2 — header.php
+
+```php
+<?php
+// Подключаем БД один раз здесь
+require_once 'connection.php';
+
+// Получаем категории для меню
+$categories = $pdo->query("SELECT DISTINCT category FROM games ORDER BY category");
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Магазин игр</title>
+    <style>
+        body { font-family: Arial; margin: 0; padding: 0; }
+        header { background: #333; color: white; padding: 15px 20px; }
+        header h1 { margin: 0; }
+        nav { background: #444; padding: 10px 20px; }
+        nav a { color: white; margin-right: 15px; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        nav a.active { color: #aaa; pointer-events: none; }
+        main { padding: 20px; }
+        .game { border-bottom: 1px solid #ccc; padding: 15px 0; }
+        .game h2 { margin: 0 0 5px; }
+        .btn { padding: 8px 15px; cursor: pointer; border: none; margin-right: 5px; }
+        .btn-info { background: #4CAF50; color: white; }
+        .btn-cart { background: #2196F3; color: white; }
+        .btn-cart:disabled { background: gray; }
+        img { max-width: 150px; float: left; margin-right: 15px; }
+        .clearfix::after { content: ''; display: block; clear: both; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🎮 Магазин игр</h1>
+</header>
+
+<!-- 5.1.3 — меню категорий -->
+<nav>
+    <?php
+    $currentCategory = isset($_GET['category']) ? $_GET['category'] : '';
+    ?>
+    <a href="index.php" 
+       class="<?= $currentCategory == '' ? 'active' : '' ?>">
+        Все
+    </a>
+    <?php while ($cat = $categories->fetch(PDO::FETCH_ASSOC)) { ?>
+        <a href="index.php?category=<?= urlencode($cat['category']) ?>"
+           class="<?= $currentCategory == $cat['category'] ? 'active' : '' ?>">
+            <?= $cat['category'] ?>
+        </a>
+    <?php } ?>
+</nav>
+
+<main>
+```
+
+---
+
+### Шаг 3 — footer.php
+
+```php
+</main>
+
+<footer style="background:#333; color:white; padding:15px 20px; margin-top:20px;">
+    <p>© <?= date('Y') ?> Магазин игр. Все права защищены.</p>
+    
+    <!-- Форма подписки -->
+    <form style="margin-top:10px;">
+        <input type="email" 
+               placeholder="Введите email" 
+               style="padding:5px; width:200px;">
+        <button type="submit" 
+                style="padding:5px 10px; background:#4CAF50; color:white; border:none; cursor:pointer;">
+            Подписаться
+        </button>
+    </form>
+</footer>
+
+</body>
+</html>
+```
+
+---
+
+### Шаг 4 — index.php
+
+```php
+<?php
+require_once 'header.php';
+
+// 5.2.1 — получаем товары
+$query = "SELECT * FROM games";
+
+// 5.2.2 — фильтрация по категории
+if (isset($_GET['category']) && $_GET['category'] != '') {
+    $stmt = $pdo->prepare("SELECT * FROM games WHERE category = ? ORDER BY name");
+    $stmt->execute([$_GET['category']]);
+} else {
+    $stmt = $pdo->prepare("SELECT * FROM games ORDER BY name");
+    $stmt->execute();
+}
+
+$games = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+
+<h2>Список товаров</h2>
+
+<?php foreach ($games as $game) { ?>
+    <div class="game">
+        <h2><?= $game['name'] ?></h2>
+        <p><?= $game['description'] ?></p>
+        
+        <!-- 5.3.1 — кнопка Подробнее -->
+        <a href="info.php?id=<?= $game['idGame'] ?>">
+            <button class="btn btn-info">Подробнее</button>
+        </a>
+    </div>
+<?php } ?>
+
+<?php require_once 'footer.php'; ?>
+```
+
+---
+
+### Шаг 5 — info.php
+
+```php
+<?php
+require_once 'header.php';
+
+$id = (int)$_GET['id'];
+
+// 5.3.3 — получаем полную информацию о товаре
+$stmt = $pdo->prepare("SELECT * FROM games WHERE idGame = ?");
+$stmt->execute([$id]);
+$game = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$game) {
+    echo "<p>Товар не найден!</p>";
+    require_once 'footer.php';
+    exit;
+}
+
+// 5.5.3 — проверяем есть ли товар в корзине
+$cartStmt = $pdo->prepare("SELECT * FROM cart WHERE idGame = ?");
+$cartStmt->execute([$id]);
+$inCart = $cartStmt->fetch(PDO::FETCH_ASSOC);
+
+// 5.5.2 — добавление в корзину
+if (isset($_POST['addToCart'])) {
+    $insertStmt = $pdo->prepare(
+        "INSERT INTO cart (idGame, added_at) VALUES (?, NOW())"
+    );
+    $insertStmt->execute([$id]);
+    $inCart = true;
+}
+
+// 5.4.2 — получаем фото товара
+$photosStmt = $pdo->prepare("SELECT * FROM photos WHERE idGame = ?");
+$photosStmt->execute([$id]);
+$photos = $photosStmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+
+<!-- 5.3.3 — полная информация -->
+<div class="clearfix">
+    <?php if (!empty($game['logo'])) { ?>
+        <img src="<?= $game['logo'] ?>" alt="<?= $game['name'] ?>">
+    <?php } ?>
+    
+    <h1><?= $game['name'] ?></h1>
+</div>
+
+<p><?= $game['description'] ?></p>
+<p><strong>Цена: <?= number_format($game['price'], 2, '.', ' ') ?> руб.</strong></p>
+<p><strong>Категория:</strong> <?= $game['category'] ?></p>
+
+<!-- 5.4.4 — фотографии -->
+<?php if (!empty($photos)) { ?>
+    <h3>Иллюстрации:</h3>
+    <?php foreach ($photos as $photo) { ?>
+        <img src="<?= $photo['photo_path'] ?>" 
+             alt="Фото" 
+             style="max-width:200px; margin:5px;">
+    <?php } ?>
+<?php } ?>
+
+<!-- 5.5.2, 5.5.3 — кнопка корзины -->
+<form method="POST">
+    <button class="btn btn-cart" 
+            type="submit" 
+            name="addToCart"
+            <?= $inCart ? 'disabled' : '' ?>>
+        <?= $inCart ? 'Товар в корзине' : 'Добавить в корзину' ?>
+    </button>
+</form>
+
+<br>
+<a href="index.php">← Назад к списку</a>
+
+<?php require_once 'footer.php'; ?>
+```
+
+---
+
+### Шаг 6 — Создать таблицы в MySQL
+
+Выполни в Workbench:
+
+```sql
+USE market;
+
+-- 5.4.1 — добавить поле logo в games
+ALTER TABLE games ADD COLUMN logo VARCHAR(255) NULL;
+
+-- 5.4.3 — таблица Photos
+CREATE TABLE IF NOT EXISTS photos (
+    photo_id INT AUTO_INCREMENT PRIMARY KEY,
+    idGame INT NOT NULL,
+    photo_path VARCHAR(255) NOT NULL,
+    FOREIGN KEY (idGame) REFERENCES games(idGame)
+);
+
+-- 5.5.1 — таблица Cart
+CREATE TABLE IF NOT EXISTS cart (
+    cart_id INT AUTO_INCREMENT PRIMARY KEY,
+    idGame INT NOT NULL,
+    added_at DATETIME NOT NULL,
+    FOREIGN KEY (idGame) REFERENCES games(idGame)
+);
+```
+
+---
+
+### Итого файлы в папке pract27
+
+```
+connection.php
+header.php
+footer.php
+index.php
+info.php
+```
+
+---
+
+### Как тестировать
+
+1. Открой `localhost/pract27/index.php`
+2. Вверху меню категорий — кликай на категорию → список фильтруется
+3. Нажми **Подробнее** на любой игре → открывается info.php
+4. На info.php нажми **Добавить в корзину** → кнопка станет серой и напишет "Товар в корзине"
+
+Пиши если ошибки!
