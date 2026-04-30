@@ -1,0 +1,374 @@
+## Практическая №26 — Модификация данных через PHP
+
+Нужно создать три новых файла: `editTable.php` и `saveTable.php`. И обновить `showTable.php`.
+
+---
+
+### Шаг 1 — Обновить showTable.php
+
+Добавь в таблицу кнопки Удалить и Редактировать. Замени весь `showTable.php`:
+
+```php
+<?php
+require_once 'connection.php';
+
+$conn = new mysqli($host, $user, $password, $database);
+
+if ($conn->connect_error) {
+    die("Ошибка подключения: " . $conn->connect_error);
+}
+
+$sortBy = '';
+if (isset($_GET['sortBy'])) {
+    $allowed = ['name', 'price'];
+    if (in_array($_GET['sortBy'], $allowed)) {
+        $sortBy = $_GET['sortBy'];
+    }
+}
+
+$filterActive = false;
+if (isset($_GET['filter']) && $_GET['filter'] == 'yes') {
+    $filterActive = true;
+}
+
+$query = "SELECT * FROM games WHERE 1=1";
+
+if ($filterActive && isset($_GET['price']) && $_GET['price'] != '') {
+    $price = (float)$_GET['price'];
+    $query .= " AND price <= $price";
+}
+
+if ($filterActive && isset($_GET['name']) && $_GET['name'] != '') {
+    $name = $conn->real_escape_string($_GET['name']);
+    $query .= " AND name LIKE '%$name%'";
+}
+
+if ($filterActive && isset($_GET['desc']) && $_GET['desc'] != '') {
+    $desc = $conn->real_escape_string($_GET['desc']);
+    $query .= " AND description LIKE '%$desc%'";
+}
+
+if ($sortBy != '') {
+    $query .= " ORDER BY " . $sortBy;
+}
+
+$result = $conn->query($query);
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Таблица игр</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 8px; }
+        th { background-color: #4CAF50; color: white; }
+        th a { color: white; text-decoration: none; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        form { margin-bottom: 15px; }
+        input[type=text] { padding: 5px; margin-right: 5px; }
+        .btn-del { background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+        .btn-upd { background: orange; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+        .btn-add { background: green; color: white; border: none; padding: 8px 15px; cursor: pointer; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<h1>Таблица товаров</h1>
+
+<!-- Сортировка -->
+<form action="showTable.php" method="GET">
+    <label><input type="radio" name="sortBy" value="name"> По названию</label>
+    <label><input type="radio" name="sortBy" value="price"> По цене</label>
+    <button type="submit">Сортировать</button>
+</form>
+
+<!-- Фильтрация -->
+<form action="showTable.php" method="GET">
+    <input type="text" name="price" placeholder="Макс. цена"
+           value="<?= isset($_GET['price']) ? $_GET['price'] : '' ?>">
+    <input type="text" name="name" placeholder="Название"
+           value="<?= isset($_GET['name']) ? $_GET['name'] : '' ?>">
+    <input type="text" name="desc" placeholder="Описание"
+           value="<?= isset($_GET['desc']) ? $_GET['desc'] : '' ?>">
+    <button type="submit" name="filter" value="yes">Фильтровать</button>
+    <button type="submit" name="filter" value="no">Очистить</button>
+</form>
+
+<!-- 5.2.1 — кнопка Добавить -->
+<form action="editTable.php" method="GET">
+    <button class="btn-add" type="submit" name="ins">Добавить</button>
+</form>
+
+<table>
+    <tr>
+        <th>Код</th>
+        <th><a href="showTable.php?sortBy=name" style="color:white">Название</a></th>
+        <th>Описание</th>
+        <th>Категория</th>
+        <th><a href="showTable.php?sortBy=price" style="color:white">Цена</a></th>
+        <th>Действия</th>
+    </tr>
+
+<?php while ($row = $result->fetch_assoc()) { ?>
+    <tr>
+        <td><?= $row['idGame'] ?></td>
+        <td><?= $row['name'] ?></td>
+        <td><?= $row['description'] ?></td>
+        <td><?= $row['category'] ?></td>
+        <td><?= number_format($row['price'], 2, '.', ' ') ?> руб.</td>
+        <td>
+            <!-- 5.3.1 — кнопка Редактировать -->
+            <form action="editTable.php" method="GET" style="display:inline">
+                <button class="btn-upd" type="submit" 
+                        name="upd" 
+                        value="<?= $row['idGame'] ?>">
+                    Редактировать
+                </button>
+            </form>
+            
+            <!-- 5.1.1 — кнопка Удалить -->
+            <form action="editTable.php" method="GET" style="display:inline">
+                <button class="btn-del" type="submit" 
+                        name="del" 
+                        value="<?= $row['idGame'] ?>">
+                    Удалить
+                </button>
+            </form>
+        </td>
+    </tr>
+<?php } ?>
+</table>
+
+</body>
+</html>
+
+<?php $conn->close(); ?>
+```
+
+---
+
+### Шаг 2 — Создать editTable.php
+
+```php
+<?php
+require_once 'connection.php';
+
+$conn = new mysqli($host, $user, $password, $database);
+
+if ($conn->connect_error) {
+    die("Ошибка подключения: " . $conn->connect_error);
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Редактирование</title>
+    <style>
+        input, textarea { display: block; margin: 5px 0 10px; padding: 5px; width: 300px; }
+        .btn { padding: 8px 15px; cursor: pointer; margin-right: 5px; }
+        .btn-yes { background: green; color: white; border: none; }
+        .btn-no { background: gray; color: white; border: none; }
+        .btn-save { background: blue; color: white; border: none; }
+    </style>
+</head>
+<body>
+
+<?php
+
+// 5.1.2 — УДАЛЕНИЕ: показываем подтверждение
+if (isset($_GET['del'])) {
+    $id = (int)$_GET['del'];
+    
+    // Получаем название игры
+    $game = $conn->query("SELECT name FROM games WHERE idGame = $id")->fetch_assoc();
+?>
+    <h2>Удаление товара</h2>
+    <p>Вы уверены что хотите удалить "<strong><?= $game['name'] ?></strong>"?</p>
+    
+    <form action="saveTable.php" method="POST">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" value="<?= $id ?>">
+        <button class="btn btn-yes" type="submit">Да</button>
+        <a href="showTable.php"><button class="btn btn-no" type="button">Нет</button></a>
+    </form>
+
+<?php
+}
+
+// 5.2.2 — ДОБАВЛЕНИЕ: форма с пустыми полями
+elseif (isset($_GET['ins'])) {
+?>
+    <h2>Добавление товара</h2>
+    
+    <form action="saveTable.php" method="POST">
+        <input type="hidden" name="action" value="insert">
+        
+        <label>Название:</label>
+        <input type="text" name="name">
+        
+        <label>Описание:</label>
+        <textarea name="description" rows="3"></textarea>
+        
+        <label>Категория:</label>
+        <input type="text" name="category">
+        
+        <label>Цена:</label>
+        <input type="text" name="price">
+        
+        <button class="btn btn-save" type="submit">Сохранить</button>
+        <a href="showTable.php"><button class="btn btn-no" type="button">Отмена</button></a>
+    </form>
+
+<?php
+}
+
+// 5.3.2 — РЕДАКТИРОВАНИЕ: форма с заполненными данными
+elseif (isset($_GET['upd'])) {
+    $id = (int)$_GET['upd'];
+    $game = $conn->query("SELECT * FROM games WHERE idGame = $id")->fetch_assoc();
+?>
+    <h2>Редактирование товара</h2>
+    
+    <form action="saveTable.php" method="POST">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="id" value="<?= $id ?>">
+        
+        <label>Название:</label>
+        <input type="text" name="name" value="<?= $game['name'] ?>">
+        
+        <label>Описание:</label>
+        <textarea name="description" rows="3"><?= $game['description'] ?></textarea>
+        
+        <label>Категория:</label>
+        <input type="text" name="category" value="<?= $game['category'] ?>">
+        
+        <label>Цена:</label>
+        <input type="text" name="price" value="<?= $game['price'] ?>">
+        
+        <button class="btn btn-save" type="submit">Сохранить</button>
+        <a href="showTable.php"><button class="btn btn-no" type="button">Отмена</button></a>
+    </form>
+
+<?php
+}
+?>
+
+</body>
+</html>
+
+<?php $conn->close(); ?>
+```
+
+---
+
+### Шаг 3 — Создать saveTable.php
+
+```php
+<?php
+require_once 'connection.php';
+
+$conn = new mysqli($host, $user, $password, $database);
+
+if ($conn->connect_error) {
+    die("Ошибка подключения: " . $conn->connect_error);
+}
+
+$action = $_POST['action'];
+$result = false;
+$message = '';
+
+// 5.1.3 — УДАЛЕНИЕ
+if ($action == 'delete') {
+    $id = (int)$_POST['id'];
+    $result = $conn->query("DELETE FROM games WHERE idGame = $id");
+    
+    if ($result) {
+        $message = "Товар успешно удалён!";
+    } else {
+        $message = "Ошибка удаления: " . $conn->error;
+    }
+}
+
+// 5.2.3 — ДОБАВЛЕНИЕ
+elseif ($action == 'insert') {
+    $name = $conn->real_escape_string($_POST['name']);
+    $description = $conn->real_escape_string($_POST['description']);
+    $category = $conn->real_escape_string($_POST['category']);
+    $price = (float)$_POST['price'];
+    
+    $result = $conn->query(
+        "INSERT INTO games (name, description, category, price) 
+         VALUES ('$name', '$description', '$category', $price)"
+    );
+    
+    if ($result) {
+        $message = "Товар успешно добавлен!";
+    } else {
+        $message = "Ошибка добавления: " . $conn->error;
+    }
+}
+
+// 5.3.3 — РЕДАКТИРОВАНИЕ
+elseif ($action == 'update') {
+    $id = (int)$_POST['id'];
+    $name = $conn->real_escape_string($_POST['name']);
+    $description = $conn->real_escape_string($_POST['description']);
+    $category = $conn->real_escape_string($_POST['category']);
+    $price = (float)$_POST['price'];
+    
+    $result = $conn->query(
+        "UPDATE games SET 
+            name = '$name',
+            description = '$description',
+            category = '$category',
+            price = $price
+         WHERE idGame = $id"
+    );
+    
+    if ($result) {
+        $message = "Товар успешно обновлён!";
+    } else {
+        $message = "Ошибка обновления: " . $conn->error;
+    }
+}
+
+$conn->close();
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Результат</title>
+</head>
+<body>
+    <h2><?= $message ?></h2>
+    <a href="showTable.php">← Вернуться к таблице</a>
+</body>
+</html>
+```
+
+---
+
+### Итого файлы в папке pract23
+
+```
+connection.php
+showList.php
+showTable.php
+editTable.php    ← новый
+saveTable.php    ← новый
+```
+
+### Как тестировать
+
+1. Открой `localhost/pract23/showTable.php`
+2. Нажми **Удалить** на любой игре → появится подтверждение → нажми Да → игра удалится
+3. Нажми **Добавить** → заполни поля → Сохранить → игра добавится
+4. Нажми **Редактировать** → измени данные → Сохранить → данные обновятся
+
+Пиши если ошибки!
