@@ -1,0 +1,59 @@
+<?php
+require_once 'connection.php';
+
+$conn = new mysqli($host, $user, $password, $database);
+
+if ($conn->connect_error) {
+    die("Ошибка подключения: " . $conn->connect_error);
+}
+
+$result = $conn->query("SELECT * FROM games");
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Таблица игр</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+<h1>Таблица товаров</h1>
+
+<table>
+    <tr>
+        <!-- Заголовки столбцов -->
+        <th>Код</th>
+        <th>Название</th>
+        <th>Описание</th>
+        <th>Категория</th>
+        <th>Цена</th>
+    </tr>
+
+<?php
+while ($row = $result->fetch_assoc()) {
+?>
+    <tr>
+        <td><?= $row['idGame'] ?></td>
+        <td><?= $row['name'] ?></td>
+        <td><?= $row['description'] ?></td>
+        <td><?= $row['category'] ?></td>
+        <td><?= number_format($row['price'], 2, '.', ' ') ?> руб.</td>
+    </tr>
+<?php
+}
+?>
+</table>
+
+</body>
+</html>
+
+<?php
+$conn->close();
+?>
