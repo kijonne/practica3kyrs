@@ -1,0 +1,118 @@
+## Практическая №24 — Сортировка
+
+Работаем с файлом `showTable.php` — добавляем форму сортировки сверху и сортировку по клику на заголовок.
+
+Замени весь `showTable.php` на это:
+
+```php
+<?php
+require_once 'connection.php';
+
+$conn = new mysqli($host, $user, $password, $database);
+
+if ($conn->connect_error) {
+    die("Ошибка подключения: " . $conn->connect_error);
+}
+
+// 5.2 — проверяем есть ли параметр сортировки
+$sortBy = '';
+if (isset($_GET['sortBy'])) {
+    // Защита — разрешаем только эти два варианта
+    $allowed = ['name', 'price'];
+    if (in_array($_GET['sortBy'], $allowed)) {
+        $sortBy = $_GET['sortBy'];
+    }
+}
+
+// Формируем запрос
+$query = "SELECT * FROM games";
+if ($sortBy != '') {
+    $query .= " ORDER BY " . $sortBy;
+}
+
+$result = $conn->query($query);
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Таблица игр</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        th a { color: white; text-decoration: none; }
+        th a:hover { text-decoration: underline; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        form { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<h1>Таблица товаров</h1>
+
+<!-- 5.1 — форма с radio кнопками -->
+<form action="showTable.php" method="GET">
+    <label>
+        <input type="radio" name="sortBy" value="name"> По названию
+    </label>
+    <label>
+        <input type="radio" name="sortBy" value="price"> По цене
+    </label>
+    <button type="submit">Сортировать</button>
+</form>
+
+<table>
+    <tr>
+        <!-- 5.3 — заголовки как ссылки для сортировки -->
+        <th>Код</th>
+        <th><a href="showTable.php?sortBy=name">Название</a></th>
+        <th>Описание</th>
+        <th>Категория</th>
+        <th><a href="showTable.php?sortBy=price">Цена</a></th>
+    </tr>
+
+<?php
+while ($row = $result->fetch_assoc()) {
+?>
+    <tr>
+        <td><?= $row['idGame'] ?></td>
+        <td><?= $row['name'] ?></td>
+        <td><?= $row['description'] ?></td>
+        <td><?= $row['category'] ?></td>
+        <td><?= number_format($row['price'], 2, '.', ' ') ?> руб.</td>
+    </tr>
+<?php
+}
+?>
+</table>
+
+</body>
+</html>
+
+<?php
+$conn->close();
+?>
+```
+
+---
+
+### Как это работает
+
+**Radio кнопки** — выбираешь название или цену и жмёшь Сортировать → страница перезагружается с параметром в адресе например `showTable.php?sortBy=price`
+
+**Ссылки в заголовках** — кликаешь на "Название" или "Цена" → тот же эффект но без кнопки
+
+**`$_GET['sortBy']`** — PHP читает параметр из адреса строки браузера
+
+**`in_array`** — проверяем что пользователь не подставил вредоносное значение, разрешаем только `name` и `price`
+
+---
+
+Проверяй:
+```
+localhost/pract23/showTable.php
+```
+
+Нажми на заголовок "Цена" — таблица должна отсортироваться по цене. Пиши если что-то не так!
