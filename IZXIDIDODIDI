@@ -1,0 +1,274 @@
+## Практическая №25 — Фильтрация и пагинация
+
+---
+
+### showList.php — пагинация + фильтр по категории
+
+Замени весь `showList.php`:
+
+```php
+<?php
+require_once 'connection.php';
+
+$conn = new mysqli($host, $user, $password, $database);
+
+if ($conn->connect_error) {
+    die("Ошибка подключения: " . $conn->connect_error);
+}
+
+// 5.1 — пагинация
+$N = 3; // количество товаров на странице
+
+// Получаем общее количество товаров
+$countResult = $conn->query("SELECT COUNT(*) FROM games");
+$countRow = $countResult->fetch_row();
+$totalGames = $countRow[0];
+$totalPages = ceil($totalGames / $N);
+
+// 5.5 — фильтр по категории
+$categoryFilter = '';
+$query = "SELECT * FROM games";
+
+if (isset($_GET['category']) && $_GET['category'] != '') {
+    $category = $conn->real_escape_string($_GET['category']);
+    $query .= " WHERE category = '$category'";
+    $categoryFilter = $_GET['category'];
+}
+
+// 5.1.2 — добавляем LIMIT если есть параметр page
+$page = 1;
+if (isset($_GET['page'])) {
+    $page = (int)$_GET['page'];
+}
+$offset = ($page - 1) * $N;
+$query .= " LIMIT $offset, $N";
+
+$result = $conn->query($query);
+
+// Получаем все категории для меню
+$categories = $conn->query("SELECT DISTINCT category FROM games");
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Список игр</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .menu { margin-bottom: 20px; }
+        .menu a { margin-right: 10px; }
+        .active { font-weight: bold; color: gray; pointer-events: none; }
+        .pagination { margin-top: 20px; }
+        .pagination a { margin-right: 5px; }
+        .current-page { font-weight: bold; }
+        hr { margin: 15px 0; }
+    </style>
+</head>
+<body>
+
+<h1>Список товаров</h1>
+
+<!-- 5.5 — меню категорий -->
+<div class="menu">
+    <strong>Категории: </strong>
+    <a href="showList.php" 
+       class="<?= $categoryFilter == '' ? 'active' : '' ?>">
+        Все
+    </a>
+    <?php
+    while ($cat = $categories->fetch_assoc()) {
+        $isActive = ($categoryFilter == $cat['category']);
+    ?>
+        <a href="showList.php?category=<?= urlencode($cat['category']) ?>"
+           class="<?= $isActive ? 'active' : '' ?>">
+            <?= $cat['category'] ?>
+        </a>
+    <?php } ?>
+</div>
+
+<!-- Список товаров -->
+<?php while ($row = $result->fetch_assoc()) { ?>
+    <div>
+        <h2><?= $row['name'] ?></h2>
+        <p><?= $row['description'] ?></p>
+        <p>Цена: <?= number_format($row['price'], 2, '.', ' ') ?> руб.</p>
+        <hr>
+    </div>
+<?php } ?>
+
+<!-- 5.1 — пагинация -->
+<div class="pagination">
+    <strong>Страницы: </strong>
+    <?php for ($i = 1; $i <= $totalPages; $i++) { ?>
+        <?php if ($i == $page) { ?>
+            <span class="current-page"><?= $i ?></span>
+        <?php } else { ?>
+            <a href="showList.php?page=<?= $i ?>
+                <?= $categoryFilter ? '&category=' . urlencode($categoryFilter) : '' ?>">
+                <?= $i ?>
+            </a>
+        <?php } ?>
+    <?php } ?>
+</div>
+
+</body>
+</html>
+
+<?php $conn->close(); ?>
+```
+
+---
+
+### showTable.php — фильтрация по цене, названию и описанию
+
+Замени весь `showTable.php`:
+
+```php
+<?php
+require_once 'connection.php';
+
+$conn = new mysqli($host, $user, $password, $database);
+
+if ($conn->connect_error) {
+    die("Ошибка подключения: " . $conn->connect_error);
+}
+
+// Сортировка
+$sortBy = '';
+if (isset($_GET['sortBy'])) {
+    $allowed = ['name', 'price'];
+    if (in_array($_GET['sortBy'], $allowed)) {
+        $sortBy = $_GET['sortBy'];
+    }
+}
+
+// 5.4 — сброс фильтра
+$filterActive = false;
+if (isset($_GET['filter']) && $_GET['filter'] == 'yes') {
+    $filterActive = true;
+}
+
+// Строим запрос
+$query = "SELECT * FROM games WHERE 1=1";
+
+// 5.2 — фильтр по цене
+if ($filterActive && isset($_GET['price']) && $_GET['price'] != '') {
+    $price = (float)$_GET['price'];
+    $query .= " AND price <= $price";
+}
+
+// 5.3 — фильтр по названию
+if ($filterActive && isset($_GET['name']) && $_GET['name'] != '') {
+    $name = $conn->real_escape_string($_GET['name']);
+    $query .= " AND name LIKE '%$name%'";
+}
+
+// 5.3 — фильтр по описанию
+if ($filterActive && isset($_GET['desc']) && $_GET['desc'] != '') {
+    $desc = $conn->real_escape_string($_GET['desc']);
+    $query .= " AND description LIKE '%$desc%'";
+}
+
+// Сортировка
+if ($sortBy != '') {
+    $query .= " ORDER BY " . $sortBy;
+}
+
+$result = $conn->query($query);
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Таблица игр</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 8px; }
+        th { background-color: #4CAF50; color: white; }
+        th a { color: white; text-decoration: none; }
+        th a:hover { text-decoration: underline; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        form { margin-bottom: 15px; }
+        input[type=text] { padding: 5px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<h1>Таблица товаров</h1>
+
+<!-- Сортировка (из пр.24) -->
+<form action="showTable.php" method="GET">
+    <label>
+        <input type="radio" name="sortBy" value="name"
+            <?= $sortBy == 'name' ? 'checked' : '' ?>> По названию
+    </label>
+    <label>
+        <input type="radio" name="sortBy" value="price"
+            <?= $sortBy == 'price' ? 'checked' : '' ?>> По цене
+    </label>
+    <button type="submit">Сортировать</button>
+</form>
+
+<!-- 5.2, 5.3, 5.4 — форма фильтрации -->
+<form action="showTable.php" method="GET">
+    <input type="text" name="price" 
+           placeholder="Макс. цена"
+           value="<?= isset($_GET['price']) ? $_GET['price'] : '' ?>">
+    
+    <input type="text" name="name" 
+           placeholder="Название"
+           value="<?= isset($_GET['name']) ? $_GET['name'] : '' ?>">
+    
+    <input type="text" name="desc" 
+           placeholder="Описание"
+           value="<?= isset($_GET['desc']) ? $_GET['desc'] : '' ?>">
+    
+    <!-- 5.4 — кнопка фильтр -->
+    <button type="submit" name="filter" value="yes">Фильтровать</button>
+    
+    <!-- 5.4 — кнопка сброс -->
+    <button type="submit" name="filter" value="no">Очистить</button>
+</form>
+
+<table>
+    <tr>
+        <th>Код</th>
+        <th><a href="showTable.php?sortBy=name">Название</a></th>
+        <th>Описание</th>
+        <th>Категория</th>
+        <th><a href="showTable.php?sortBy=price">Цена</a></th>
+    </tr>
+
+<?php while ($row = $result->fetch_assoc()) { ?>
+    <tr>
+        <td><?= $row['idGame'] ?></td>
+        <td><?= $row['name'] ?></td>
+        <td><?= $row['description'] ?></td>
+        <td><?= $row['category'] ?></td>
+        <td><?= number_format($row['price'], 2, '.', ' ') ?> руб.</td>
+    </tr>
+<?php } ?>
+</table>
+
+</body>
+</html>
+
+<?php $conn->close(); ?>
+```
+
+---
+
+### Что проверять
+
+**showList.php:**
+- Внизу должны быть номера страниц — кликай на них
+- Вверху меню категорий — кликай на категорию, список фильтруется, активная категория становится серой
+
+**showTable.php:**
+- Введи цену например `1000` → нажми Фильтровать → покажет только игры дешевле 1000
+- Введи часть названия → фильтрует по названию
+- Нажми Очистить → фильтр сбрасывается
+
+Пиши если ошибки!
